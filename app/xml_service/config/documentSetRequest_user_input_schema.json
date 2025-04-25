@@ -1,0 +1,279 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "insurantId": {
+      "type": "string",
+      "description": "Systemweit eindeutige Kennung des Versicherten. Entspricht der Versichertennummer / KVNR." 
+    },
+    "author": {
+      "type": "object",
+      "properties": {
+        "person": {
+          "type": "string",
+          "description": "Name der einstellenden Person oder des einstellenden Systems. Der Wert MUSS den Formatvorgaben aus Abschnitt 2.1.4.3.1 genügen."
+        },
+        "institution": {
+          "type": "string",
+          "description": "Institution, welcher die einstellende Person oder das einstellende System zugeordnet ist. Der Wert MUSS den Formatvorgaben aus Abschnitt 2.1.4.3.2 (A_21209) genügen."
+        }
+      },
+      "required": [
+        "person",
+        "institution"
+      ]
+    },
+    "submissionSet": {
+      "type": "object",
+      "properties": {
+        "entryUUID": {
+          "type": "string",
+          "description": "Intern verwendete, aktenweit eindeutige Kennung des Submission Sets. Der Wert MUSS den Formatvorgaben aus [IHE-ITI-TF3#4.2.3.3.5] genügen.",
+          "default": "urn:uuid:<UUID>"
+        },
+        "submissionTime": {
+          "type": "string",
+          "description": "Zeit, zu der das Submission Set zusammengestellt wurde. Der Wert MUSS den Formatvorgaben aus [IHE-ITI-TF3#4.2.3.3.10] genügen.",
+          "default": "YYYYMMDDHHMMSS"
+        },
+        "title": {
+          "type": "string",
+          "description": "Titel des Submission Sets. Der Wert MUSS den Formatvorgaben aus [IHE-ITI-TF3#4.2.3.3.11] genügen."
+        },
+        "comments": {
+          "type": "string",
+          "description": "Ergänzende Hinweise zum Submission Set in Freitext. Der Wert MUSS den Formatvorgaben aus [IHE-ITI-TF3#4.2.3.3.3] genügen."
+        },
+        "contentTypeCode": {
+          "type": "object",
+          "description": "Klinische Aktivität, die zum Einstellen des Submission Set geführt hat. Der Wert MUSS einem Code des in [gemSpec_Voc_ePA] definierten Value Sets für SubmissionSet.contentTypeCode entsprechen.",
+          "properties": {
+            "displayName": {
+              "type": "string"
+            },
+            "codingScheme": {
+              "type": "string"
+            },
+            "code": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "displayName",
+            "codingScheme",
+            "code"
+          ]
+        },
+        "author": {
+          "type": "object",
+          "properties": {
+            "specialty": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Fachliche Spezialisierung der einstellenden Person oder des einstellenden Systems. Der Wert MUSS einem Code des in [gemSpec_Voc_ePA] definierten Value Sets für DocumentEntry.authorSpecialty oder aus der Tabelle in der Anforderung A_15744-* entsprechen."
+            },
+            "telecommunication": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Telekommunikationsdaten der einstellenden Person oder des einstellenden Systems. Der Wert MUSS den Formatvorgaben aus [IHE-ITI-TF3#4.2.3.1.4.5] genügen."
+            }
+          },
+          "required": []
+        },
+        "uniqueId": {
+          "type": "string",
+          "description": "Eindeutige Kennung des Submission Sets. Der Wert MUSS den Formatvorgaben aus [IHE-ITI-TF3#4.2.3.3.12] genügen.",
+          "default": "2.25.<OID>"
+        },
+        "intendedRecipient": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Vorgesehener Adressat des Submission Set. Der Wert MUSS den Formatvorgaben aus [IHE-ITI-TF3#4.2.3.3.7] genügen."
+        }
+      },
+      "required": [
+      ]
+    },
+    "documentEntry": {
+      "type": "object",
+      "properties": {
+        "mimeType": {
+          "type": "string",
+          "description": "MIME-Typ des Dokuments.",
+          "enum": [
+            "application/fhir+xml",
+            "application/pdf"
+          ],
+          "default": "application/fhir+xml"
+        },
+        "entryUUID": {
+          "type": "string",
+          "description": "Intern verwendete, aktenweit eindeutige Kennung des Dokuments. Der Wert MUSS den Formatvorgaben aus [IHE-ITI-TF3#4.2.3.2.7] genügen."
+        },
+        "uniqueId": {
+          "type": "string",
+          "description": "Eindeutige, aktenweite Kennung des Dokuments. Der Wert MUSS den Formatvorgaben aus [IHE-ITI-TF3#4.2.3.2.26] genügen.",
+          "default": "2.25.<OID>"
+        },
+        "creationTime": {
+          "type": "string",
+          "description": "Erstellungszeitpunkt des Dokuments. Der Wert MUSS den Formatvorgaben aus [IHE-ITI-TF3#4.2.3.2.6] genügen und DARF NICHT in der Zukunft liegen."
+        },
+        "languageCode": {
+          "type": "string",
+          "description": "Sprache, in der das Dokument abgefasst ist. Der Wert MUSS einem Code des in [gemSpec_Voc_ePA] definierten Value Sets für DocumentEntry.languageCode entsprechen. Defaultwert ist 'de-DE'.",
+          "default": "de-DE"
+        },
+        "URI": {
+          "type": "string",
+          "description": "URI für das Dokument. Der Wert MUSS den Formatvorgaben aus [IHE-ITI-TF3#4.2.3.2.27] genügen.",
+          "default": "TEST"
+        },
+        "confidentialityCode": {
+          "type": "array",
+          "description": "Vertraulichkeitskennzeichnung des Dokuments. Der Wert MUSS einem Code des in [gemSpec_Voc_ePA] definierten Value Sets für DocumentEntry.confidentialityCode entsprechen.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "displayName": {
+                "type": "string"
+              },
+              "codeSystem": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "displayName",
+              "codeSystem"
+            ]
+          },
+          "default": [
+            {
+              "code": "N",
+              "displayName": "normal",
+              "codeSystem": "2.16.840.1.113883.5.25"
+            }
+          ]
+        },
+        "title": {
+          "type": "string",
+          "description": "Titel des Dokuments. Der Wert MUSS den Formatvorgaben aus [IHE-ITI-TF3#4.2.3.2.24] genügen."
+        },
+        "comments": {
+          "type": "string",
+          "description": "Ergänzende Hinweise in Freitext. Der Wert MUSS den Formatvorgaben aus [IHE-ITI-TF3#4.2.3.2.4] genügen."
+        },
+        "author": {
+          "type": "object",
+          "properties": {
+            "role": {
+              "type": "string",
+              "description": "Rolle des Autors. Der Wert MUSS einem Code des in [gemSpec_Voc_ePA] definierten Value Sets für DocumentEntry.authorRole entsprechen."
+            },
+            "specialty": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Fachliche Spezialisierung des Autors. Der Wert MUSS einem Code des in [gemSpec_Voc_ePA] definierten Value Sets für DocumentEntry.authorSpecialty oder aus der Tabelle in der Anforderung A_15744-* entsprechen."
+            },
+            "telecommunication": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Telekommunikationsdaten des Autors. Der Wert MUSS den Formatvorgaben aus [IHE-ITI-TF3#4.2.3.1.4.5] genügen."
+            }
+          },
+          "required": []
+        },
+        "serviceStartTime": {
+          "type": "string",
+          "description": "Zeitpunkt, an dem das im Dokument dokumentierte (Behandlungs-)Ereignis begonnen wurde. Der Wert MUSS den Formatvorgaben aus [IHE-ITI-TF3#4.2.3.2.19] genügen."
+        },
+        "serviceStopTime": {
+          "type": "string",
+          "description": "Zeitpunkt, an dem das im Dokument dokumentierte (Behandlungs-)Ereignis beendet wurde. Der Wert MUSS den Formatvorgaben aus [IHE-ITI-TF3#4.2.3.2.20] genügen."
+        },
+        "sourcePatientId": {
+          "type": "string",
+          "description": "Kennung des Patienten im Quellsystem. Der Wert MUSS den Formatvorgaben aus [IHE-ITI-TF3#4.2.3.2.22] genügen."
+        },
+        "sourcePatientInfo": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Demographische Daten zum Patienten im Quellsystem. Der Wert MUSS den Formatvorgaben aus [IHE-ITI-TF3#4.2.3.2.23] genügen."
+        },
+        "eventCodeList": {
+          "type": "array",
+          "description": "Ereignisse, die zur Erstellung des Dokuments geführt haben. Der Wert MUSS den Formatvorgaben aus [IHE-ITI-TF3#4.2.3.2.8] genügen und einem Code des in [gemSpec_Voc_ePA] definierten Value Sets für DocumentEntry.eventCode entsprechen.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "displayName": {
+                "type": "string"
+              },
+              "codeSystem": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "displayName",
+              "codeSystem"
+            ]
+          }
+        },
+        "legalAuthenticator": {
+          "type": "string",
+          "description": "Rechtlich Verantwortlicher für das Dokument. Der Wert MUSS den Formatvorgaben aus [IHE-ITI-TF3#4.2.3.2.14] genügen."
+        },
+        "old_entry_uuid": {
+          "type": "string",
+          "description": "Die alte Eintrags-UUID des Dokuments."
+        },
+        "referenceIdList": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Liste von IDs, mit denen das Dokument assoziiert wird. Der Wert MUSS den Formatvorgaben aus [IHE-ITI-TF3#4.2.3.2.28] genügen."
+        }
+      },
+      "required": [
+        "entryUUID",
+        "creationTime",
+        "URI",
+        "title"
+      ]
+    },
+    "document": {
+      "type": "object",
+      "properties": {
+        "contentId": {
+          "type": "string",
+          "description": "The content ID of the document"
+        }
+      }
+    }
+  },
+  "required": [
+    "insurantId",
+    "documentEntry"
+  ]
+}

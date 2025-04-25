@@ -1,0 +1,56 @@
+// https://profiles.ihe.net/ITI/TF/Volume3/ch-4.2.html#4.2.5
+{
+	"patientId": {
+		"identificationScheme": "urn:uuid:6b5aea1a-874d-4603-a4bc-96a0a7b38446"
+	},
+	"submissionSet": {
+		"author": {
+			"classificationScheme": "urn:uuid:a7058bb9-b4e4-4307-ba5b-e3f0ab85e12d",
+			"role": "12^^^&1.3.6.1.4.1.19376.3.276.1.5.13&ISO"
+		},
+		"contentTypeCode": {
+			"classificationScheme": "urn:uuid:aa543740-bdda-424e-8c96-df4873be8500"
+		},
+		"uniqueId": {
+			"identificationScheme": "urn:uuid:96fdda7c-d067-4183-912e-bf5ee74998a8"
+		}
+	},
+	"documentEntry": {
+		"author": {
+			"classificationScheme": "urn:uuid:93606bcf-9494-43ec-9b4e-a7748d1a838d"
+		},
+		"patientId": {
+			"identificationScheme": "urn:uuid:58a6f841-87b3-4a3e-92fd-a8ffeff98427"
+		},
+		"uniqueId": {
+			"identificationScheme": "urn:uuid:2e82c1f6-a085-4c72-9da3-8640a32e42ab"
+		},
+		"confidentialityCode": {
+			"classificationScheme": "urn:uuid:f4f85eac-e6cb-4883-b524-f2705394840f"
+		},
+		"eventCodeList": {
+			"classificationScheme": "urn:uuid:2c6b8cb7-8b2a-4051-b291-b1ae6a575ef4"
+		},
+		"classCode": {
+			"classificationScheme": "urn:uuid:41a5887f-8865-4c09-adf7-e362475b143a"
+		},
+		"formatCode": {
+			"classificationScheme": "urn:uuid:a09d5840-386c-46f2-b5ad-9c3699a4309d"
+		},
+		"typeCode": {
+			"classificationScheme": "urn:uuid:f0306f51-975f-434e-a61c-c59651d33983"
+		},
+		"healthcareFacilityTypeCode": {
+			"classificationScheme": "urn:uuid:f33fb8ac-18af-42cc-ae0e-ed0b0bdb91e1",
+			"code": "PAT",
+			"codeSystem": "1.3.6.1.4.1.19376.3.276.1.5.3",
+			"displayName": "Patient außerhalb der Betreuung"
+		},
+		"practiceSettingCode": {
+			"classificationScheme": "urn:uuid:cccf5598-8b07-4b77-a05e-ae952c785ead",
+			"code": "PAT",
+			"codeSystem": "1.3.6.1.4.1.19376.3.276.1.5.5",
+			"displayName": "Patient außerhalb der Betreuung"
+		}
+	}
+}

@@ -1,0 +1,7 @@
+*.spp
+
+release.jenkinsfile
+validation.jenkinsfile
+gitHubPublish.jenkinsfile
+gitHubPull.jenkinsfile
+

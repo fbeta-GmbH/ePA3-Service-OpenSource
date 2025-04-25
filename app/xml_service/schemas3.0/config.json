@@ -1,0 +1,71 @@
+{
+    "submissionTime": "SubmissionTime",
+    "authorPerson": "9-SMC-B-Testkarte-883110000145382^DIGA-Hersteller^Sina Gr..fin ..zTEST-ONLY^^^Prof. Dr.^^^&1.2.276.0.76.4.282&ISO",
+    "authorRole": "12^^^&1.3.6.1.4.1.19376.3.276.1.5.13&ISO",
+    "authorInstitution": "diga^^^^^&1.2.276.0.76.4.188&ISO^^^^9-SMC-B-Testkarte-883110000145382",
+    "patientId": "InsurantId^^^&1.2.276.0.76.4.8&ISO",
+    "uniqueId": "Unique_OID",
+    "creationTime": "CreationTime",
+    "languageCode": "de-DE",
+    "URI": "File_Name",
+    "serviceStartTime": "20210301082855",
+    "serviceStopTime": "20210301083855",
+    "classifications": [
+        {
+            "classificationScheme": "urn:uuid:41a5887f-8865-4c09-adf7-e362475b143a",
+            "nodeRepresentation": "DUR",
+            "id": "a27ca4e7-e9e1-4b8f-9902-e604ec2b9e77",
+            "codingScheme": "1.3.6.1.4.1.19376.3.276.1.5.8",
+            "name": "Durchf..hrungsprotokoll"
+        },
+        {
+            "classificationScheme": "urn:uuid:f4f85eac-e6cb-4883-b524-f2705394840f",
+            "nodeRepresentation": "N",
+            "id": "0bb19e24-f8e5-49b7-9a1d-610851eedbb6",
+            "codingScheme": "2.16.840.1.113883.5.25",
+            "name": "normal"
+        },
+        {
+            "classificationScheme": "urn:uuid:2c6b8cb7-8b2a-4051-b291-b1ae6a575ef4",
+            "nodeRepresentation": "H1",
+            "id": "52c83b53-5d88-4efe-86f2-262bff6a32ba",
+            "codingScheme": "1.3.6.1.4.1.19376.3.276.1.5.15",
+            "name": "vom Patienten mitgebracht"
+        },
+        {
+            "classificationScheme": "urn:uuid:a09d5840-386c-46f2-b5ad-9c3699a4309d",
+            "nodeRepresentation": "urn:gematik:ig:diga:v1.1",
+            "id": "1c9b41a4-8940-40d0-bf67-d4257a30f2ad",
+            "codingScheme": "1.3.6.1.4.1.19376.3.276.1.5.6",
+            "name": "DiGA (gematik) v1.1"
+        },
+        {
+            "classificationScheme": "urn:uuid:f33fb8ac-18af-42cc-ae0e-ed0b0bdb91e1",
+            "nodeRepresentation": "PAT",
+            "id": "f5f4a969-6552-4f2e-a50e-d071b7180846",
+            "codingScheme": "1.3.6.1.4.1.19376.3.276.1.5.3",
+            "name": "Patient au..erhalb der Betreuung"
+        },
+        {
+            "classificationScheme": "urn:uuid:cccf5598-8b07-4b77-a05e-ae952c785ead",
+            "nodeRepresentation": "PAT",
+            "id": "4d95aa06-2848-4aa8-a9a2-51ec5be0b8f5",
+            "codingScheme": "1.3.6.1.4.1.19376.3.276.1.5.5",
+            "name": "Patient au..erhalb der Betreuung"
+        },
+        {
+            "classificationScheme": "urn:uuid:f0306f51-975f-434e-a61c-c59651d33983",
+            "nodeRepresentation": "PATD",
+            "id": "60a98200-8f73-43c4-8e69-f8e94ab4195c",
+            "codingScheme": "1.3.6.1.4.1.19376.3.276.1.5.9",
+            "name": "Patienteneigene Dokumente"
+        },
+        {
+            "classificationScheme": "urn:uuid:93606bcf-9494-43ec-9b4e-a7748d1a838d",
+            "nodeRepresentation": "PAT",
+            "id": "67b4eded-5d44-4904-bc29-361468279b09",
+            "codingScheme": "1.3.6.1.4.1.19376.3.276.1.5.3",
+            "name": "Patient au..erhalb der Betreuung"
+        }
+    ]
+}
