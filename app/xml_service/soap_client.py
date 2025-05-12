@@ -375,6 +375,15 @@ class SoapClient:
             }
         }
 
+        if input_data["documentEntry"]["URI"].endswith(".xml"):
+            default_input["documentEntry"]["mimeType"] = "application/fhir+xml"
+        elif input_data["documentEntry"]["URI"].endswith(".pdf"):
+            default_input["documentEntry"]["mimeType"] = "application/pdf"
+        else:
+            raise ValueError(
+                f"Unsupported file type for Document URI: {input_data['documentEntry']['URI']}. Supported types are .xml and .pdf."
+            )
+        
         # Merge default input with user input
         input_data = utils.deep_merge_dicts(default_input, input_data)
         input_data = dict(dict_to_defaultdict(input_data))
@@ -565,12 +574,6 @@ class SoapClient:
         soap_env.get_xop_env_as_bytes = lambda: custom_get_xop_env_as_bytes(soap_env)
         
         xop_pack = XopPackage(soap_env=soap_env, files=mtom_transport.files)
-        
-        # add newline to second to last line
-        xop_package_lines = xop_pack.package.split(b'\r\n')
-        xop_package_lines[-1] = b'\r\n' + xop_package_lines[-1]
-        xop_pack.package = b'\r\n'.join(xop_package_lines)
-        xop_pack.package =  xop_pack.package.replace(b'\r\n', b'\n')
 
         # Replace the default URL in the package with the AS_URL
         xop_pack.package = xop_pack.package.replace(b'https://FQDN-from-DNS-lookup:443', AS_URL.encode('utf-8').rstrip(b'/'))

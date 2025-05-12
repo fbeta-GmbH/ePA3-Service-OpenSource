@@ -1,10 +1,11 @@
 from dataclasses import dataclass
 import os
 import dotenv
-from app.logging_config import logger
 
 dotenv.load_dotenv()
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 
+from app.logging_config import logger  # noqa: E402
 
 logger.info("Loading constants")
 
@@ -134,8 +135,6 @@ MANDANT_ID = os.getenv('MANDANT_ID')
 CLIENT_SYSTEM_ID = os.getenv('CLIENT_SYSTEM_ID')
 WORKPLACE_ID = os.getenv('WORKPLACE_ID')
 USER_ID = os.getenv('USER_ID')
-
-LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
 
 
 logger.info(f"""

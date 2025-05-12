@@ -2,7 +2,6 @@
 import os
 
 import json
-from pyjson5 import load as json5_load
 
 from app.logging_config import logger
 
@@ -15,7 +14,7 @@ from app.xml_service.soap_client import SoapClient
 
 
 from app.utils.cert_data_util import ReadCertData
-from app.constants import get_as_url, DEFAULT_AS_URL, set_telematik_id, set_oid_diga
+from app.constants import DEFAULT_AS_URL, set_telematik_id, set_oid_diga
 
 
 def send_document_to_epa(metadata: dict, document_file_name: str):
@@ -46,6 +45,10 @@ def send_document_to_epa(metadata: dict, document_file_name: str):
         card, card_certificate = auth.get_card_data()
 
         card = auth.get_cards()
+        
+        is_verified = auth.is_card_pin_verified(card_handle=card)
+        logger.info("Card PIN verified: %s", is_verified)
+
         card_certificate = auth.read_card_certificate(card_handle=card)
         auth.store_card_data(card=card, card_certificate=card_certificate)
         logger.info("Stored card data")
@@ -94,7 +97,7 @@ def send_document_to_epa(metadata: dict, document_file_name: str):
             # Use the fixed header in the upload
             response = vau_con.upload_document(
                 vau_np=vau_np, 
-                soap_message=document_upload_message["package"].decode("utf-8"), 
+                soap_message=document_upload_message["package"], 
                 boundary_string=document_upload_message["boundary"],
                 insurant_id=metadata['insurantId']
             )

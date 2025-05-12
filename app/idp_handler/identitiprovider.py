@@ -9,7 +9,7 @@ from jwcrypto import common, jwe, jwk, jws
 
 from app.logging_config import logger
 
-from app.constants import IDP_URL
+from app.constants import IDP_URL, USER_AGENT
 
 from app.exceptions import IdentitiyProviderException
 class IdentitiProvider:
@@ -267,8 +267,8 @@ class IdentitiProvider:
         key = jwk.JWK.from_json(puk_idp_enc)
 
         jwe_token = jwe.JWE(json.dumps(outer_payload).encode('utf-8'),
-                     recipient=key,
-                     protected=outer_header)
+                    recipient=key,
+                    protected=outer_header)
         
         encrypted_njwt = jwe_token.serialize(compact=True)
 
@@ -278,7 +278,9 @@ class IdentitiProvider:
             'signed_challenge': encrypted_njwt
         }
 
-        response = requests.post(IDP_URL + '/auth', data=data, timeout=30, allow_redirects=False)
+        response = requests.post(IDP_URL + '/auth', data=data, timeout=30, allow_redirects=False, headers={
+            "x-useragent": USER_AGENT,
+        })
         logger.debug("Auth NJWT response: %s", response.headers)
         logger.debug("Auth NJWT response body: %s", response.text)
 

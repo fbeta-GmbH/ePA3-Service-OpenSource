@@ -575,7 +575,7 @@ class VAUKanal:
                 new_uri,
                 headers={
                     "Content-Type": "application/octet-stream",
-                    "x-useragent": "usrAgent/1.1.0",
+                    "x-useragent": USER_AGENT,
                 },
                 timeout=34,
                 verify=False,
@@ -661,7 +661,7 @@ class VAUKanal:
             )
 
     def upload_document(
-        self, vau_np: str, soap_message: str, boundary_string: str, insurant_id: str
+        self, vau_np: str, soap_message: bytes, boundary_string: str, insurant_id: str
     ) -> dict:
         """
         Uploads a document to the specified endpoint using a SOAP message.
@@ -694,13 +694,12 @@ class VAUKanal:
             inner_request += f"x-useragent: {USER_AGENT}\r\n"
             inner_request += f"x-insurantid:{insurant_id}\r\n"
             inner_request += "\r\n"
-            inner_request += f"{body}"
+            
+            inner_request = inner_request.encode("utf-8") + body
 
             # Read and store the soap message log content
-            # with open("soap_message_log.txt", "w", encoding="utf-8") as file:
-            #         file.write(inner_request)
-
-            inner_request = inner_request.encode("utf-8")
+            # with open("soap_message_log.txt", "wb") as file:
+            #     file.write(inner_request)
 
             logger.debug("Inner HTTP request: %s", inner_request)
 
