@@ -1,0 +1,32 @@
+[project]
+name = "ePA3-Service-OpenSource"
+version = "0.1.0"
+description = "Default template for PDM package"
+authors = [
+    {name = "A K", email = "a.korsak@medice.de"},
+]
+dependencies = [
+    "cbor2==5.6.5",
+    "coloredlogs==15.0.1",
+    "cryptography==44.0.2",
+    "ecdsa==0.19.1",
+    "icecream==2.1.4",
+    "Jinja2==3.1.6",
+    "jwcrypto==1.5.6",
+    "oqs==0.10.2",
+    "python-dotenv==1.1.0",
+    "Requests==2.32.3",
+    "python-multipart",
+    "zeep==4.3.1",
+    "lxml==5.3.2",
+    "jsonschema==4.23.0",
+    "pymtom-xop==0.0.2",
+    "pyjson5==1.6.8",
+]
+requires-python = "==3.13.*"
+readme = "README.md"
+license = {text = "MIT"}
+
+
+[tool.pdm]
+distribution = false

@@ -466,3 +466,6 @@ FodyWeavers.xsd
 *.sln.iml
 
 card_data.db
+
+liboqs-python/
+liboqs/
