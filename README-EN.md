@@ -68,10 +68,10 @@ Alternatively, you can set the complete Author string directly:
 
     ```bash
     # Extract certificate
-    openssl pkcs12 -in certificate.p12 -clcerts -nokeys -out cert.pem
+    openssl pkcs12 -in vKon_Client_certificate.p12 -clcerts -nokeys -out cert.pem -legacy
 
     # Extract private key
-    openssl pkcs12 -in certificate.p12 -nocerts -nodes -out key.pem
+    openssl pkcs12 -in vKon_Client_certificate.p12 -nocerts -nodes -out key.pem -legacy
     ```
 
     You will be prompted for the import password for the .p12 file.
