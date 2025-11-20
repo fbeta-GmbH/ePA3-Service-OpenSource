@@ -128,6 +128,9 @@ class Konnektor:
                 timeout=15,
             )
 
+            # Provide more detailed log ouput
+            logger.debug(response.text)
+
             # Evaluate the response using zeep
             parsed_response = SoapClient.parse_xml_response(response, SoapClient.Services.EventService.EventServicePort.GetCards)
 
@@ -240,6 +243,9 @@ class Konnektor:
                 data=soap_request,
                 timeout=15
             )
+
+            # Provide more detailed log ouput
+            logger.debug(response.text)
 
             parsed_response = SoapClient.parse_xml_response(
                 response,
