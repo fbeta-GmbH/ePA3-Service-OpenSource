@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  epa-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - EPA_ENVIRONMENT=${EPA_ENVIRONMENT:-RT}
+      - DEFAULT_EPA_PROVIDER_ID=${DEFAULT_EPA_PROVIDER_ID:-2}
+      - USER_AGENT=${USER_AGENT:-usrAgent/1.1.0}
+      - KONNEKTOR_URL=${KONNEKTOR_URL:-https://konnektor.ru.tiaas.rise-ti.de}
+      - DIGA_NAME=${DIGA_NAME}
+      - DIGA_MANUFACTURER=${DIGA_MANUFACTURER}
+      - SW_ADDITION_1=${SW_ADDITION_1:-}
+      - SW_ADDITION_2=${SW_ADDITION_2:-}
+      - SW_ADDITION_3=${SW_ADDITION_3:-}
+      - MANDANT_ID=${MANDANT_ID}
+      - CLIENT_SYSTEM_ID=${CLIENT_SYSTEM_ID}
+      - WORKPLACE_ID=${WORKPLACE_ID}
+      - USER_ID=${USER_ID:-}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - SENTRY_DSN=${SENTRY_DSN:-}
+      - RECORD_PROVIDER_1=${RECORD_PROVIDER_1:-IBM}
+      - RECORD_PROVIDER_2=${RECORD_PROVIDER_2:-Bitmarck Technik}
+    volumes:
+      - ./app/data:/app/app/data
+    env_file:
+      - ./app/.env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

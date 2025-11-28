@@ -22,11 +22,23 @@ dependencies = [
     "jsonschema==4.23.0",
     "pymtom-xop==0.0.2",
     "pyjson5==1.6.8",
+    "fastapi==0.115.6",
+    "uvicorn==0.34.0",
+    "sentry-sdk==2.18.0",
+    "pytest>=9.0.1",
+    "httpx>=0.28.1",
 ]
 requires-python = "==3.13.*"
 readme = "README.md"
 license = {text = "MIT"}
 
+[project.optional-dependencies]
+test = [
+    "pytest>=8.3.4",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
+    "httpx>=0.28.1",
+]
 
 [tool.pdm]
 distribution = false

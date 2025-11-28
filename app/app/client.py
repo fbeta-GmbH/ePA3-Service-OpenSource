@@ -14,7 +14,7 @@ from app.xml_service.soap_client import SoapClient
 
 
 from app.utils.cert_data_util import ReadCertData
-from app.constants import DEFAULT_AS_URL, set_telematik_id, set_oid_diga
+from app.constants import DEFAULT_AS_URL, get_oid_diga, get_telematik_id, set_telematik_id, set_oid_diga
 
 
 def send_document_to_epa(metadata: dict, document_file_name: str):
@@ -43,11 +43,12 @@ def send_document_to_epa(metadata: dict, document_file_name: str):
 
         #Get card handle and certificate
         card, card_certificate = auth.get_card_data()
+        logger.info("===> Card handle: %s", card)
 
         card = auth.get_cards()
         
         is_verified = auth.is_card_pin_verified(card_handle=card)
-        logger.info("Card PIN verified: %s", is_verified)
+        logger.info("===> Card PIN verified: %s", is_verified)
 
         card_certificate = auth.read_card_certificate(card_handle=card)
         auth.store_card_data(card=card, card_certificate=card_certificate)
@@ -56,12 +57,21 @@ def send_document_to_epa(metadata: dict, document_file_name: str):
         set_telematik_id(ReadCertData(cert_base64=card_certificate).read_telematik_id())
         set_oid_diga(ReadCertData(cert_base64=card_certificate).read_profession_oid())
 
+        logger.info("===> Telematik ID: %s", get_telematik_id())
+        logger.info("===> OID Diga: %s", get_oid_diga())
 
         # Create signed attest JWT
         attest_jwt = auth.create_signed_attest_jwt(nonce=nonce, card_handle=card, card_certificate=card_certificate)
 
+        logger.info("===> Attest JWT: %s", attest_jwt)
+        logger.info("===> Nonce: %s", nonce)
+        logger.info("===> insurant ID: %s", metadata['insurantId'])
+
         # Create challenge token
         challenge_token, user_consent = vau_con.send_authorization_request_sc(insurant_id=metadata['insurantId'])
+
+        logger.info("===> Challenge token: %s", challenge_token)
+        logger.info("===> User consent: %s", user_consent)
 
         header_payload_challenge_string = idp.auth_build_inner_header_payload(challenge_token=challenge_token, card_cert=card_certificate)
 
@@ -114,7 +124,7 @@ if __name__ == "__main__":
     logger.info("Starting ePA client")
 
     sample_metadata = {
-        "insurantId": "X99999999",
+        "insurantId": "X110591068",
         "documentEntry": {
             "creationTime": "20230609115053",
             "title": "Testdokument",
