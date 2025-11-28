@@ -7,6 +7,8 @@ KVNR="${KVNR:-X110591068}"
 TITLE="${TITLE:-Test Document}"
 CREATION_TIME="${CREATION_TIME:-$(date +%Y%m%d%H%M%S)}"
 DOCUMENT_FILE="${DOCUMENT_FILE:-}"
+ADMIN_USERNAME="${ADMIN_USERNAME:-admin}"
+ADMIN_PASSWORD="${ADMIN_PASSWORD:-changeme}"
 
 usage() {
     cat << EOF
@@ -30,6 +32,8 @@ ENVIRONMENT VARIABLES:
     TITLE                  Document title
     CREATION_TIME          Document creation time
     DOCUMENT_FILE          Path to document file
+    ADMIN_USERNAME         HTTP Basic Auth username (default: admin)
+    ADMIN_PASSWORD         HTTP Basic Auth password (default: changeme)
 
 EXAMPLES:
     # Basic upload
@@ -115,6 +119,7 @@ echo "  File: $DOCUMENT_FILE"
 CURL_ARGS=(
     -X POST
     "$API_URL/epa/3.0/documents"
+    -u "$ADMIN_USERNAME:$ADMIN_PASSWORD"
     -F "kvnr=$KVNR"
     -F "title=$TITLE"
     -F "creation_time=$CREATION_TIME"

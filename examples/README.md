@@ -65,6 +65,8 @@ You can also configure the script using environment variables:
 - `TITLE` - Document title
 - `CREATION_TIME` - Document creation time
 - `DOCUMENT_FILE` - Path to document file
+- `ADMIN_USERNAME` - HTTP Basic Auth username (default: admin)
+- `ADMIN_PASSWORD` - HTTP Basic Auth password (default: changeme)
 
 ## API Documentation
 
@@ -73,6 +75,22 @@ You can also configure the script using environment variables:
 **POST** `/epa/3.0/documents`
 
 Upload a document to the ePA 3.0 service.
+
+### Authentication
+
+The API uses HTTP Basic Authentication. You must provide valid credentials in the request:
+
+```bash
+curl -u username:password ...
+```
+
+Default credentials (change these for production!):
+- Username: `admin`
+- Password: `changeme`
+
+Set custom credentials using environment variables:
+- `ADMIN_USERNAME` - Set the admin username
+- `ADMIN_PASSWORD` - Set the admin password
 
 ### Request
 

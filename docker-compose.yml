@@ -25,6 +25,8 @@ services:
       - SENTRY_DSN=${SENTRY_DSN:-}
       - RECORD_PROVIDER_1=${RECORD_PROVIDER_1:-IBM}
       - RECORD_PROVIDER_2=${RECORD_PROVIDER_2:-Bitmarck Technik}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-changeme}
     volumes:
       - ./app/data:/app/app/data
     env_file:

@@ -1,11 +1,13 @@
 import os
 import uuid
 import tempfile
+import secrets
 from contextlib import asynccontextmanager
-from typing import Optional
+from typing import Optional, Annotated
 
 import sentry_sdk
-from fastapi import FastAPI, HTTPException, status, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, status, UploadFile, File, Form, Depends
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel, Field
 
 from app.logging_config import logger
@@ -23,6 +25,28 @@ if sentry_dsn:
     logger.info("Sentry initialized")
 else:
     logger.warning("SENTRY_DSN not set, Sentry will not be initialized")
+
+
+# HTTP Basic Authentication setup
+security = HTTPBasic()
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "changeme")
+
+
+def verify_credentials(credentials: Annotated[HTTPBasicCredentials, Depends(security)]) -> str:
+    """Verify HTTP Basic Auth credentials"""
+    correct_username = secrets.compare_digest(credentials.username.encode("utf8"), ADMIN_USERNAME.encode("utf8"))
+    correct_password = secrets.compare_digest(credentials.password.encode("utf8"), ADMIN_PASSWORD.encode("utf8"))
+
+    if not (correct_username and correct_password):
+        logger.warning(f"Failed authentication attempt for username: {credentials.username}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+
+    return credentials.username
 
 
 @asynccontextmanager
@@ -72,10 +96,12 @@ class ErrorResponse(BaseModel):
     response_model=DocumentCreatedResponse,
     responses={
         201: {"model": DocumentCreatedResponse, "description": "Document created successfully"},
-        400: {"model": ErrorResponse, "description": "Bad request - validation or upload error"}
+        400: {"model": ErrorResponse, "description": "Bad request - validation or upload error"},
+        401: {"description": "Unauthorized - invalid credentials"}
     }
 )
 async def upload_document(
+    username: Annotated[str, Depends(verify_credentials)],
     kvnr: str = Form(..., description="Patient insurance number (Krankenversichertennummer)"),
     title: str = Form(..., description="Document title"),
     creation_time: str = Form(..., description="Creation time in format YYYYMMDDHHMMSS"),

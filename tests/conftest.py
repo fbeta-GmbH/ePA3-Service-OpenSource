@@ -20,7 +20,9 @@ os.environ.update({
     'USER_ID': 'test_user',
     'DEFAULT_EPA_PROVIDER_ID': '2',
     'LOG_LEVEL': 'INFO',
-    'USER_AGENT': 'test-agent/1.0.0'
+    'USER_AGENT': 'test-agent/1.0.0',
+    'ADMIN_USERNAME': 'testuser',
+    'ADMIN_PASSWORD': 'testpass'
 })
 
 # Mock the send_document_to_epa function before importing anything
@@ -57,3 +59,11 @@ def sample_xml_content():
     <id value="test-bundle"/>
     <type value="document"/>
 </Bundle>'''
+
+
+@pytest.fixture
+def auth_headers():
+    """HTTP Basic Auth headers for testing"""
+    import base64
+    credentials = base64.b64encode(b"testuser:testpass").decode("ascii")
+    return {"Authorization": f"Basic {credentials}"}
