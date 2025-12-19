@@ -466,3 +466,5 @@ FodyWeavers.xsd
 *.sln.iml
 
 card_data.db
+
+dependencies/
