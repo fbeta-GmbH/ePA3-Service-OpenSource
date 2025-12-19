@@ -31,7 +31,7 @@ default = [
     "pymtom_xop==0.0.2",
     "python-dotenv==1.1.0",
     "python-multipart==0.0.20",
-    "requests==2.32.3",
+    "requests==2.32.4",
     "zeep==4.3.1",
     "liboqs-python @ git+https://github.com/open-quantum-safe/liboqs-python.git@9ab93b648e0253087f3c627af3674c058ede391b#egg=liboqs-python"
 ]
