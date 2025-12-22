@@ -1,0 +1,43 @@
+name: Update Poetry Lock File
+
+# When this action will be executed
+on:
+  # Automatically trigger it when detected changes in repo
+  push:
+    # Branched to look out for changes on
+    branches:
+      [ prod ]
+    paths:
+      # Look out for changes in these files/folders
+      - 'pyproject.toml'
+
+  # Allow manually trigger of the jobs
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+    # Job run image.
+    build:
+      runs-on: ubuntu-latest
+
+      # Steps that need to happen in this job run.
+      steps:
+        # Check out the code
+        - name: Check out code
+          uses: actions/checkout@v4
+        
+        - name: Install Poetry
+          run: |
+            curl -sSL https://install.python-poetry.org | python3 -
+        - name: Generate poetry.lock
+          run: |
+            poetry lock
+        - name: Commit poetry.lock
+          run: |
+            git config --local user.email "github-actions[bot]@users.noreply.github.com"
+            git config --local user.name "github-actions[bot]"
+            git add poetry.lock
+            git commit -m "chore: update poetry.lock" || echo "No changes to commit"
+            git push origin HEAD:prod
