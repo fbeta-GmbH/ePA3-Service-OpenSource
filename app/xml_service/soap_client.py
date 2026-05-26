@@ -13,6 +13,7 @@ from zeep.xsd import (Any, AnySimpleType, Type)
 
 import argparse
 import textwrap
+from fastapi import status
 from collections import OrderedDict
 from functools import lru_cache
 from typing import Any, Dict, Tuple
@@ -306,7 +307,7 @@ class SoapClient:
             try:
                 parsed_response = binding.process_reply(client, operation, response)
             except zeep.exceptions.TransportError as e:
-                if response.status_code >= 400:
+                if response.status_code >= status.HTTP_400_BAD_REQUEST:
                     logger.error(f"Response status code: {response.status_code}")
                     return {"Status": {"Result": "Error", "Error": f"HTTP Error {response.status_code}"}}
 

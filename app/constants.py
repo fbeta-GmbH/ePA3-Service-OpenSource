@@ -104,21 +104,21 @@ def set_institution():
         raise ValueError("DIGA_MANUFACTURER not set")
     os.environ['INSTITUTION'] = generate_institution()
 
-def get_telematik_id() -> str:
+def get_telematik_id() -> str | None:
     if 'TELEMATIK_ID' not in os.environ:
         raise ValueError("TELEMATIK_ID not set")
     return os.getenv('TELEMATIK_ID')
 
-def get_oid_diga() -> str:
+def get_oid_diga() -> str | None:
     if 'OID_DIGA' not in os.environ:
         raise ValueError("OID_DIGA not set")
     return os.getenv('OID_DIGA')
 
-def get_author() -> str:
+def get_author() -> str | None:
     set_author()
     return os.getenv('AUTHOR')
 
-def get_institution() -> str:
+def get_institution() -> str | None:
     set_institution()
     return os.getenv('INSTITUTION')
 

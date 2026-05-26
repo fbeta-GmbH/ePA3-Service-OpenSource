@@ -7,7 +7,7 @@ from app.logging_config import logger
 
 from app.vau import VAUProtokoll
 from app.konnektor import Konnektor
-from app.idp_handler import identitiprovider
+from app.idp_handler import identityprovider
 
 import app.utils.utils as utils
 from app.xml_service.soap_client import SoapClient
@@ -33,8 +33,8 @@ def send_document_to_epa(metadata: dict, document_file_name: str):
         p12_path = os.path.join(os.path.dirname(__file__),'..', 'data', 'KVS_Client_172.026.002.094.p12')
         auth = Konnektor.Konnektor(p12_path)
 
-        logger.info("Initializing IdentitiProvider")
-        idp = identitiprovider.IdentitiProvider()
+        logger.info("Initializing IdentityProvider")
+        idp = identityprovider.IdentityProvider()
 
 
         # Get nonce from VAUProtokoll
