@@ -1,67 +1,22 @@
-from dataclasses import dataclass
 import os
-import dotenv
 
-dotenv.load_dotenv()
+from app.runtime_config.bootstrap import _APP_ROOT, USER_CONFIG_DIR, load_env
+from app.logging_config import logger
+from app.runtime_config.epa_env import EpaEnvs
+
+load_env()
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 
-from app.logging_config import logger  # noqa: E402
-
-logger.info("Loading constants")
+logger.info(f"Loading constants using config from /{os.path.relpath(USER_CONFIG_DIR, _APP_ROOT)}")
 
 # Dynamically load RECORD_PROVIDER_X variables from the environment
-RECORD_PROVIDER_MAPPING = {}
+RECORD_PROVIDER_MAPPING: dict[str, int] = {}
 for key, value in os.environ.items():
     if key.startswith("RECORD_PROVIDER_"):
         provider_name = value.strip()
         provider_id = key.split("_")[-1]  # Extract the number from the variable name
         RECORD_PROVIDER_MAPPING[provider_name] = int(provider_id)
 
-@dataclass
-class EpaEnvConfig:
-    """See: https://gemspec.gematik.de/docs/gemSpec/gemSpec_Aktensystem_ePAfueralle/latest/#A_24592-02"""
-    id: str
-    name: str
-    subdomain : str
-    idp_subdomain: str
-    
-    prefix_as = "epa-as"
-    prefix_asisa = "epa-asisa"
-    domain = "epa4all.de"
-
-    def get_as_url(self, provider_id: str) -> str:
-        return f"https://{self.prefix_as}-{provider_id}.{self.subdomain}.{self.domain}/"
-    
-    def get_idp_url(self) -> str:
-        return f"https://{self.idp_subdomain}.zentral.idp.splitdns.ti-dienste.de"
-
-class EpaEnvs:
-    RU = EpaEnvConfig(
-        id="RU",
-        name="RU1 / RU_ref", 
-        subdomain="ref",
-        idp_subdomain="idp-ref"
-    )
-    RT = EpaEnvConfig(
-        id="RT",
-        name="RU2 / RU_dev", 
-        subdomain="dev",
-        idp_subdomain="idp-ref"
-    )
-    PROD = EpaEnvConfig(
-        id="PROD",
-        name="PROD", 
-        subdomain="prod",
-        idp_subdomain="idp"
-    )
-
-    @classmethod
-    def available_envs(cls) -> list[str]:
-        return [env.id for env in vars(cls).values() if isinstance(env, EpaEnvConfig)]
-
-    @classmethod
-    def get(cls, env_name: str) -> EpaEnvConfig:
-        return getattr(cls, env_name)
 
 
 def generate_author() -> str:
@@ -126,13 +81,14 @@ EPA_ENVIRONMENT = os.getenv('EPA_ENVIRONMENT', 'RT').upper()
 if EPA_ENVIRONMENT not in EpaEnvs.available_envs():
     raise ValueError(f"Invalid EPA_ENVIRONMENT: {EPA_ENVIRONMENT}. (Available environments are: {', '.join(EpaEnvs.available_envs())})")
 
-def get_as_url(provider_id: str) -> str:
-    return EpaEnvs.get(EPA_ENVIRONMENT).get_as_url(provider_id)
+epa_envs = EpaEnvs.get(EPA_ENVIRONMENT)
 
+def get_as_url(provider_id: str) -> str:
+    return epa_envs.get_as_url(provider_id)
 
 DEFAULT_EPA_PROVIDER_ID = os.getenv('DEFAULT_EPA_PROVIDER_ID', '2')
 DEFAULT_AS_URL = get_as_url(str(DEFAULT_EPA_PROVIDER_ID))
-IDP_URL = EpaEnvs.get(EPA_ENVIRONMENT).get_idp_url()
+IDP_URL = epa_envs.get_idp_url()
 
 USER_AGENT = os.getenv('USER_AGENT')
 
@@ -148,11 +104,21 @@ WORKPLACE_ID = os.getenv('WORKPLACE_ID')
 USER_ID = os.getenv('USER_ID')
 
 KONNEKTOR_CERT_PW = os.getenv('KONNEKTOR_CERT_PW')
+KONNEKTOR_JWS_URL = os.getenv("KONNEKTOR_JWS_URL", "")
+"""
+URL to a JWS file published by the Konnektor provider, containing trusted server certificates, used to verify the identity of the Konnektor. 
+If empty, TLS server verification is disabled (verify=False) in all Konnektor requests.
+"""
 
 HTTPS_TIMEOUT = int(os.getenv('HTTPS_TIMEOUT', '30'))
 
 IDP_AUTH_PATH = "/auth"
-KONNEKTOR_URL = os.getenv('KONNEKTOR_URL') 
+KONNEKTOR_URL = os.getenv('KONNEKTOR_URL')
+
+if KONNEKTOR_CERT_PW is None:
+    raise ValueError("KONNEKTOR_CERT_PW is not set. Please set it in your .env file.")
+if not KONNEKTOR_URL:
+    raise ValueError("KONNEKTOR_URL is not set. Please set it in your .env file.")
 
 logger.info(f"""
 Constants loaded:

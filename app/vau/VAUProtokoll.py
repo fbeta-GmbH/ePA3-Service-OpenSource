@@ -31,7 +31,7 @@ from urllib.parse import urljoin
 from app.logging_config import logger
 
 from app.vau import kemvau, utils
-from app.constants import USER_AGENT, EPA_ENVIRONMENT, HTTPS_TIMEOUT, EpaEnvs
+from app.runtime_config.constants import USER_AGENT, EPA_ENVIRONMENT, HTTPS_TIMEOUT, EpaEnvs
 
 from app.exceptions import DocumentException, VAUException, AuthorizationException, AuthenticationException, ErrorCodes
 

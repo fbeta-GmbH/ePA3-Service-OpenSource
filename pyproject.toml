@@ -19,7 +19,7 @@ authors = [
 default = [
     "cbor2==5.9.0",
     "coloredlogs==15.0.1",
-    "cryptography==46.0.7",
+    "cryptography==48.0.0",
     "ecdsa==0.19.2",
     "fastapi==0.136.1",
     "icecream==2.2.0",

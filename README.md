@@ -6,9 +6,9 @@ Dieses Projekt implementiert:
 
 ## Voraussetzungen
 
-- Python 3.8 oder höher
+- Python 3.12 oder höher
 - PowerShell
-- TI-Terminal-CA Zertifikat
+- TI-Terminal-CA (Konnektor) Zertifikat als `.p12`-Datei
 
 ## Installation
 
@@ -20,12 +20,12 @@ Um alle notwendigen Abhängigkeiten zu installieren, führen Sie das Skript `ins
 
 ## Umgebungskonfiguration
 
-1. Kopieren Sie die Datei `.env.template` zu `.env`:
+1. Kopieren Sie die Datei `config/.env.template` zu `config/.env`:
    ```bash
-   cp app/.env.template app/.env
+   cp config/.env.template config/.env
    ```
 
-2. Füllen Sie die folgenden Umgebungsvariablen in der `.env` Datei aus:
+2. Füllen Sie die folgenden Umgebungsvariablen in der Datei `config/.env` aus:
 
 ### Basis-Konfiguration
 - `EPA_ENVIRONMENT`: Umgebung der ePA (z. B. `RU`, `RT`, `PROD`)
@@ -54,25 +54,10 @@ Alternativ können Sie auch direkt den kompletten Author-String setzen:
 
 ## Konfiguration
 
-1. Teilen Sie das TI-Terminal-CA Zertifikat in zwei separate Dateien:
-    - `cert.pem`: Das Zertifikat
-    - `key.pem`: Der private Schlüssel
+1. Legen Sie das Konnektor-Zertifikat als `.p12`-Datei im Verzeichnis `config/` ab, z. B. als `config/cert.p12`.
 
-    Wenn Sie eine .p12 Datei haben, können Sie OpenSSL verwenden:
+2. Legen Sie die Laufzeitkonfiguration in `config/.env` ab. 
 
-    ```bash
-    # Zertifikat extrahieren
-    openssl pkcs12 -in certificate.p12 -clcerts -nokeys -out cert.pem
-
-    # Privaten Schlüssel extrahieren
-    openssl pkcs12 -in certificate.p12 -nocerts -nodes -out key.pem
-    ```
-
-    Sie werden nach dem Import-Passwort für die .p12 Datei gefragt.
-   - `cert.pem`: Das Zertifikat
-   - `key.pem`: Der private Schlüssel
-
-2. Legen Sie beide Dateien im Verzeichnis `app/data` ab.
 
 ## Verwendung
 
@@ -86,12 +71,13 @@ Dabei ist `sample_metadata.insurantId` durch eine gültige Versicherten-ID zu er
 
 ### Ablauf
 1. Der AuthZ-Workflow der ePA 3.x wird initiiert.
-2. Nach erfolgreicher Authentifizierung wird eine Test-MIO-Datei (`REAL_EXAMPLE_1_KBV_PR_MIO_DIGA_Bundle.xml`) in die Akte geschrieben.
+2. Nach erfolgreicher Authentifizierung wird eine Test-MIO-Datei aus `app/data/examples/documents/REAL_EXAMPLE_1_KBV_PR_MIO_DIGA_Bundle.xml` in die Akte geschrieben.
 
 ## Fehlerbehandlung
 
 Bei Problemen überprüfen Sie bitte:
-- Sind die Zertifikatsdateien korrekt im `app/data` Verzeichnis platziert?
+- Liegt die `.p12`-Datei im Verzeichnis `config/`?
+- Ist `config/.env` vorhanden und vollständig befüllt?
 - Ist die Versicherten-ID gültig und die restlichen Metadaten korrekt?
 - Sind alle Abhängigkeiten erfolgreich installiert worden?
 - Ist der SMC-B PIN verifiziert?

@@ -1,7 +1,11 @@
 import logging
 import coloredlogs
-
+import os
 import warnings
+
+from app.runtime_config.bootstrap import load_env
+load_env()
+
 
 def setup_logging(log_level=None):
     """Configure logging settings based on the LOG_LEVEL environment variable.
@@ -33,6 +37,5 @@ def setup_logging(log_level=None):
         coloredlogs.install(level=log_level, fmt=fmt, logger=logger, reconfigure=False)
     return logger
 
-logger = setup_logging() 
-from app.constants import LOG_LEVEL
-logger = setup_logging(LOG_LEVEL) 
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+logger = setup_logging(LOG_LEVEL)

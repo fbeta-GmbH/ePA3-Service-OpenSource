@@ -11,7 +11,7 @@ from typing import Any
 
 from app.logging_config import logger
 
-from app.constants import IDP_URL, USER_AGENT, IDP_AUTH_PATH, HTTPS_TIMEOUT
+from app.runtime_config.constants import IDP_URL, USER_AGENT, IDP_AUTH_PATH, HTTPS_TIMEOUT
 
 from app.exceptions import IdentityProviderException, ErrorCodes
 class IdentityProvider:

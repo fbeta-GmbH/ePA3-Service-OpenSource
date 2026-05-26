@@ -15,10 +15,9 @@ from requests.adapters import HTTPAdapter
 from app.logging_config import logger
 
 from app.utils.utils import convert_der_ecdsa_to_concated_x962
-from app.constants import MANDANT_ID, CLIENT_SYSTEM_ID, USER_AGENT, WORKPLACE_ID, HTTPS_TIMEOUT, USER_ID, DIGA_NAME, DIGA_MANUFACTURER, KONNEKTOR_URL, KONNEKTOR_CERT_PW
+from app.runtime_config.constants import MANDANT_ID, CLIENT_SYSTEM_ID, USER_AGENT, WORKPLACE_ID, HTTPS_TIMEOUT, USER_ID, DIGA_NAME, DIGA_MANUFACTURER, KONNEKTOR_URL, KONNEKTOR_CERT_PW
 
 from app.exceptions import KonnektorException, CardException, ErrorCodes
-
 from app.xml_service.soap_client import SoapClient
 
 
@@ -545,7 +544,7 @@ class Konnektor:
                 error_code=ErrorCodes.KONNEKTOR_REQUEST_FAILED
                 )
         except CardException as e:
-            raise e
+            raise
         except Exception as e:
             raise KonnektorException(
                 message=f"Authentication error: {str(e)}",
