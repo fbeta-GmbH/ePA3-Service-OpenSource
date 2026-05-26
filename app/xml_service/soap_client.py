@@ -41,7 +41,7 @@ from app.xml_service.documentSetRequest_model import (
 from app.xml_service.generated_wsdl_classes import (
     CONN_AUTHSIGNATURESERVICE_V7_4_1, CONN_CERTIFICATESERVICE_V6_0_1, CONN_CARDSERVICE,
     CONN_EVENTSERVICE, XDSDOCUMENTSERVICE, WsdlOperation, WsdlService)
-from app.constants import DEFAULT_AS_URL, get_author, get_institution
+from app.runtime_config.constants import DEFAULT_AS_URL, get_author, get_institution
 
 
 class SoapClient:
@@ -276,7 +276,7 @@ class SoapClient:
             logger.error(f"Error occurred while generating XML for operation '{operation}': {e}")
             logger.warning("Listing available operations for reference:")
             SoapClient.list_operations(operation.service, operation)
-            raise e
+            raise
         
         if raw:
             return response
@@ -655,9 +655,9 @@ if __name__ == "__main__":
     AS_URL = DEFAULT_AS_URL
     parser = argparse.ArgumentParser(description="Create ProvideAndRegisterDocumentSetRequest from input data.")
 
-    parser.add_argument("input", help="Path to the input JSON file or a JSON string representing the input dictionary.", default=os.path.join(os.path.dirname(__file__), "..", "data", "document_upload_metadata.json"), nargs="?")
+    parser.add_argument("input", help="Path to the input JSON file or a JSON string representing the input dictionary.", default=os.path.join(os.path.dirname(__file__), "..", "data", "examples", "payloads", "sample_upload_user_input.json"), nargs="?")
 
-    parser.add_argument("-d", "--document", help="Path to the document file to be included in the request.", default=os.path.join(os.path.dirname(__file__), "..","data","REAL_EXAMPLE_1_KBV_PR_MIO_DIGA_Bundle.xml"))
+    parser.add_argument("-d", "--document", help="Path to the document file to be included in the request.", default=os.path.join(os.path.dirname(__file__), "..", "data", "examples", "documents", "REAL_EXAMPLE_1_KBV_PR_MIO_DIGA_Bundle.xml"))
 
     parser.add_argument("-o", "--output", help="Path to the output XML file.", default=os.path.join(os.path.dirname(__file__), "provideAndRegisterDocumentSetRequest.xml"))
 

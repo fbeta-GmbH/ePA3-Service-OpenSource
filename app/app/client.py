@@ -14,23 +14,23 @@ from app.xml_service.soap_client import SoapClient
 
 
 from app.utils.cert_data_util import ReadCertData
-from app.constants import DEFAULT_AS_URL, set_telematik_id, set_oid_diga
+from app.runtime_config.constants import DEFAULT_AS_URL, set_telematik_id, set_oid_diga
 
 
 def send_document_to_epa(metadata: dict, document_file_name: str):
-        document_file_location = os.path.join(os.path.dirname(__file__),'..', 'data', document_file_name)
-        
+        document_file_location = os.path.join(
+            os.path.dirname(__file__), '..', 'data', 'examples', 'documents', document_file_name
+        )
+
         logger.info("Starting ePA-Client")
 
         AS_URL = DEFAULT_AS_URL
 
-
         logger.info("Creating new session")
         vau_con = VAUProtokoll.VAUKanal(AS_URL)
 
-        
         logger.info("Initializing Konnektor")
-        p12_path = os.path.join(os.path.dirname(__file__),'..', 'data', 'KVS_Client_172.026.002.094.p12')
+        p12_path = os.path.join(os.path.dirname(__file__),'..', '..', 'config', 'cert.p12')
         auth = Konnektor.Konnektor(p12_path)
 
         logger.info("Initializing IdentityProvider")
@@ -44,7 +44,7 @@ def send_document_to_epa(metadata: dict, document_file_name: str):
         card, card_certificate = auth.get_card_data()
 
         card = auth.get_cards()
-        
+
         is_verified = auth.is_card_pin_verified(card_handle=card)
         logger.info("Card PIN verified: %s", is_verified)
 
