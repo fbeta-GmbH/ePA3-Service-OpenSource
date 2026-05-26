@@ -1,6 +1,8 @@
 import logging
 import coloredlogs
 
+import warnings
+
 def setup_logging(log_level=None):
     """Configure logging settings based on the LOG_LEVEL environment variable.
     The function sets up logging configuration with colored output using the coloredlogs package.

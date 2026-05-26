@@ -6,6 +6,14 @@
       "type": "string",
       "description": "Systemweit eindeutige Kennung des Patienten. Der Wert MUSS den Inhalts- und Formatvorgaben aus A_14974* genügen."
     },
+    "providerId": {
+      "type": "integer",
+      "description": "Die zugeordnete Zahl des ePA-Aktensystemanbieters, der die Akte des Versicherten verwaltet. Siehe https://gemspec.gematik.de/docs/gemSpec/gemSpec_Aktensystem_ePAfueralle/latest/#A_24592-02",
+      "examples": [
+        1,
+        2
+      ]
+    },
     "author": {
       "type": "object",
       "properties": {
@@ -28,13 +36,17 @@
       "properties": {
         "entryUUID": {
           "type": "string",
-          "description": "Intern verwendete, aktenweit eindeutige Kennung des Submission Sets. Der Wert MUSS den Formatvorgaben aus [IHE-ITI-TF3#4.2.3.3.5] genügen.",
-          "default": "urn:uuid:<UUID>"
+          "description": "Intern verwendete, aktenweit eindeutige Kennung des Submission Sets. Der Wert MUSS den Formatvorgaben aus [IHE-ITI-TF3#4.2.3.3.5] genügen. Wird automatisch generiert, wenn nicht manuell gesetzt.",
+          "examples": [
+            "urn:uuid:<UUID>"
+          ]
         },
         "submissionTime": {
           "type": "string",
-          "description": "Zeit, zu der das Submission Set zusammengestellt wurde. Der Wert MUSS den Formatvorgaben aus [IHE-ITI-TF3#4.2.3.3.10] genügen.",
-          "default": "YYYYMMDDHHMMSS"
+          "description": "Zeit, zu der das Submission Set zusammengestellt wurde. Der Wert MUSS den Formatvorgaben aus [IHE-ITI-TF3#4.2.3.3.10] genügen. Wird automatisch mit aktuellem Datum/Zeitpunkt bei Erstellung des Requests generiert, wenn nicht manuell gesetzt.",
+          "examples": [
+            "<YYYYMMDDHHMMSS>"
+          ]
         },
         "title": {
           "type": "string",
@@ -90,8 +102,10 @@
         },
         "uniqueId": {
           "type": "string",
-          "description": "Eindeutige Kennung des Submission Sets. Der Wert MUSS den Formatvorgaben aus [IHE-ITI-TF3#4.2.3.3.12] genügen.",
-          "default": "2.25.<OID>"
+          "description": "Eindeutige Kennung des Submission Sets. Der Wert MUSS den Formatvorgaben aus [IHE-ITI-TF3#4.2.3.3.12] genügen. Wird automatisch generiert, wenn nicht manuell gesetzt.",
+          "examples": [
+            "2.25.<OID>"
+          ]
         },
         "intendedRecipient": {
           "type": "array",
@@ -112,21 +126,22 @@
       "properties": {
         "mimeType": {
           "type": "string",
-          "description": "MIME-Typ des Dokuments.",
+          "description": "MIME-Typ des Dokuments. Wenn nicht gesetzt, wird dieser aus der URI abgeleitet. ",
           "enum": [
             "application/fhir+xml",
             "application/pdf"
-          ],
-          "default": "application/fhir+xml"
+          ]
         },
         "entryUUID": {
           "type": "string",
-          "description": "Intern verwendete, aktenweit eindeutige Kennung des Dokuments. Der Wert MUSS den Formatvorgaben aus [IHE-ITI-TF3#4.2.3.2.7] genügen."
+          "description": "Intern verwendete, aktenweit eindeutige Kennung des Dokuments. Der Wert MUSS den Formatvorgaben aus [IHE-ITI-TF3#4.2.3.2.7] genügen. Kann abgespeichert und später als oldEntryUUID verwendet werden, um ein Dokument zu aktualisieren. "
         },
         "uniqueId": {
           "type": "string",
-          "description": "Eindeutige, aktenweite Kennung des Dokuments. Der Wert MUSS den Formatvorgaben aus [IHE-ITI-TF3#4.2.3.2.26] genügen.",
-          "default": "2.25.<OID>"
+          "description": "Eindeutige, aktenweite Kennung des Dokuments. Der Wert MUSS den Formatvorgaben aus [IHE-ITI-TF3#4.2.3.2.26] genügen. Wird automatisch generiert, wenn nicht manuell gesetzt.",
+          "examples": [
+            "2.25.<OID>"
+          ]
         },
         "creationTime": {
           "type": "string",
@@ -134,7 +149,10 @@
         },
         "languageCode": {
           "type": "string",
-          "description": "Sprache, in der das Dokument abgefasst ist. Der Wert MUSS einem Code des in [gemSpec_Voc_ePA] definierten Value Sets für DocumentEntry.languageCode entsprechen. Defaultwert ist 'de-DE'.",
+          "description": "Sprache, in der das Dokument abgefasst ist. Der Wert MUSS einem Code des in [gemSpec_Voc_ePA] definierten Value Sets für DocumentEntry.languageCode entsprechen. ",
+          "examples": [
+            "de-DE"
+          ],
           "default": "de-DE"
         },
         "URI": {
@@ -163,6 +181,15 @@
               "codeSystem"
             ]
           },
+          "examples": [
+            [
+              {
+                "code": "N",
+                "displayName": "normal",
+                "codeSystem": "2.16.840.1.113883.5.25"
+              }
+            ]
+          ],
           "default": [
             {
               "code": "N",
@@ -249,9 +276,9 @@
           "type": "string",
           "description": "Rechtlich Verantwortlicher für das Dokument. Der Wert MUSS den Formatvorgaben aus [IHE-ITI-TF3#4.2.3.2.14] genügen."
         },
-        "old_entry_uuid": {
+        "oldEntryUUID": {
           "type": "string",
-          "description": "Die alte Eintrags-UUID des Dokuments."
+          "description": "Die alte entryUUID des Dokuments."
         },
         "referenceIdList": {
           "type": "array",
@@ -270,15 +297,6 @@
         "URI",
         "title"
       ]
-    },
-    "document": {
-      "type": "object",
-      "properties": {
-        "contentId": {
-          "type": "string",
-          "description": "The content ID of the document"
-        }
-      }
     }
   },
   "required": [

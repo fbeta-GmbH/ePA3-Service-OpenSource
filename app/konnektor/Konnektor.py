@@ -1,6 +1,6 @@
-
 from typing import Optional, Tuple
 import requests
+import requests_pkcs12
 import base64
 import hashlib
 import datetime
@@ -8,43 +8,55 @@ import json
 import sqlite3
 import os
 
+
 from requests import Session
 from requests.adapters import HTTPAdapter
 
 from app.logging_config import logger
 
 from app.utils.utils import convert_der_ecdsa_to_concated_x962
-from app.constants import MANDANT_ID, CLIENT_SYSTEM_ID, USER_AGENT, WORKPLACE_ID, USER_ID, DIGA_NAME, DIGA_MANUFACTURER, KONNEKTOR_URL
+from app.constants import MANDANT_ID, CLIENT_SYSTEM_ID, USER_AGENT, WORKPLACE_ID, HTTPS_TIMEOUT, USER_ID, DIGA_NAME, DIGA_MANUFACTURER, KONNEKTOR_URL, KONNEKTOR_CERT_PW
 
-from app.exceptions import KonnektorException, CardException
+from app.exceptions import KonnektorException, CardException, ErrorCodes
 
 from app.xml_service.soap_client import SoapClient
 
 
 
 class Konnektor:
-    def __init__(self, path_to_cert:str, path_to_key:str)->None:
+    def __init__(self, path_to_p12:str)->None:
         """
         Initialize a new instance of the Konnektor class.
         
         Args:
-            path_to_cert (str): Path to the certificate file
-            path_to_key (str): Path to the private key file
+            path_to_p12 (str): Path to the PKCS#12 (.p12) certificate file
         """
-        logger.info("Initializing Konnektor with cert: %s and key: %s", path_to_cert, path_to_key)
-        self.cert = path_to_cert
-        self.key = path_to_key
+        logger.info("Initializing Konnektor with p12 certificate: %s", path_to_p12)
+        self.path_to_p12 = path_to_p12
+        self.cert_password = KONNEKTOR_CERT_PW
 
         self.session = Session()
-        self.session.mount("https://", HTTPAdapter(max_retries=2))
+
+        pkcs12_adapter = requests_pkcs12.Pkcs12Adapter(
+            pkcs12_filename=self.path_to_p12,
+            pkcs12_password=self.cert_password
+        )
+
+        self.session.mount("https://", pkcs12_adapter)
         self.session.mount("http://", HTTPAdapter(max_retries=2))
         self.session.headers.update({
             'Content-Type': 'application/xml',
         })
         self.session.verify = False
-        self.session.cert = (self.cert, self.key)
 
         self.db = self.init_db()
+        
+        try:
+            self.test_connection()
+        except KonnektorException as e:
+            logger.error("Failed to initialize Konnektor connection: %s", str(e))
+            raise
+        
 
 
     def init_db(self)->sqlite3.Connection:
@@ -58,6 +70,29 @@ class Konnektor:
                     (id INTEGER PRIMARY KEY, card TEXT, card_certificate TEXT)''')
         db.commit()
         return db
+    
+    def test_connection(self)->bool:
+        """
+        Test the connection to the Konnektor by sending a simple GET request.
+
+        Returns:
+            bool: True if the connection is successful, False otherwise.
+        """
+        try:
+            response = self.session.get(f'{KONNEKTOR_URL}/connector.sds', timeout=HTTPS_TIMEOUT)
+            if response.status_code == 200:
+                logger.info("Konnektor connection test successful")
+                return True
+            else:
+                logger.error("Konnektor connection test failed with status code: %d", response.status_code)
+                return False     
+        except requests.exceptions.RequestException as e:
+
+            raise KonnektorException(
+                message=f"Konnektor initialization failed due to connection error: {e}",
+                error_code=ErrorCodes.KONNEKTOR_INIT_FAILED)
+            
+            
 
 
     def store_card_data(self, card:Optional[str]=None, card_certificate:Optional[str]=None)->None:
@@ -125,7 +160,7 @@ class Konnektor:
             response = self.session.post(
                 f'{KONNEKTOR_URL}/webservices/eventservice',
                 data=soap_request,
-                timeout=15,
+                timeout=HTTPS_TIMEOUT,
             )
 
             # Evaluate the response using zeep
@@ -143,12 +178,20 @@ class Konnektor:
                         if card_handle is not None:
                             return card_handle
 
-            raise CardException("No SMC-B card found. Is the card inserted and the connection to the terminal established?")
+            raise CardException(
+                message="No SMC-B card found. Is the card inserted and the connection to the terminal established?",
+                error_code=ErrorCodes.CARD_NOT_FOUND)
         
         except requests.exceptions.RequestException as e:
-            raise KonnektorException(f"Failed to communicate with Konnektor: {e}")
+            raise KonnektorException(
+                message=f"Failed to communicate with Konnektor: {e}",
+                error_code=ErrorCodes.KONNEKTOR_REQUEST_FAILED
+                )
         except Exception as e:
-            raise KonnektorException(f"Error during card retrieval: {str(e)}")
+            raise KonnektorException(
+                message=f"Error during card retrieval: {str(e)}",
+                error_code=ErrorCodes.UNEXPECTED_ERROR,
+                )
 
 
     def read_card_certificate(self, card_handle: str) -> str:
@@ -184,7 +227,7 @@ class Konnektor:
             response = self.session.post(
                 f'{KONNEKTOR_URL}/webservices/certificateservice',
                 data=soap_request,
-                timeout=15
+                timeout=HTTPS_TIMEOUT
             )
 
             # Evaluate the response using zeep
@@ -196,14 +239,20 @@ class Konnektor:
             # Extract the certificate
             certificate_bytes = parsed_response.get('X509DataInfoList', {}).get('X509DataInfo', [{}])[0].get('X509Data', {}).get('X509Certificate', None)
             if not certificate_bytes:
-                raise KonnektorException("No certificate found")
+                raise KonnektorException(
+                    message="No certificate found",
+                    error_code=ErrorCodes.CARD_CERTIFICATE_ERROR
+                    )
 
             # Encode the certificate in Base64
             certificate_base64 = base64.b64encode(certificate_bytes).decode('utf-8')
             return certificate_base64
         
         except requests.exceptions.RequestException as e:
-            raise KonnektorException(f"Failed to read card certificate: {str(e)}")
+            raise KonnektorException(
+                message=f"Failed to read card certificate: {str(e)}",
+                error_code=ErrorCodes.CARD_CERTIFICATE_ERROR
+                )
         except Exception as e:
             raise KonnektorException(f"Error processing certificate: {str(e)}")
 
@@ -234,11 +283,11 @@ class Konnektor:
                     "PinTyp": "PIN.SMC", 
                 }
             )
-
+            
             response = self.session.post(
                 f'{KONNEKTOR_URL}/webservices/cardservice',
                 data=soap_request,
-                timeout=15
+                timeout=HTTPS_TIMEOUT
             )
 
             parsed_response = SoapClient.parse_xml_response(
@@ -248,8 +297,12 @@ class Konnektor:
 
             if parsed_response['Status']['Result'] != 'OK' or parsed_response['Status']['Error'] != None: 
                 if parsed_response['Status']['Error'] == "Karte nicht als gesteckt identifiziert":
-                    raise CardException(f"{parsed_response['Status']['Error']}", error_code='CARD_NOT_FOUND')
-                raise CardException(f"{parsed_response['Status']['Error']}")
+                    raise CardException(
+                        message=f"{parsed_response['Status']['Error']}", 
+                        error_code=ErrorCodes.CARD_NOT_FOUND)
+                raise CardException(
+                    message=f"{parsed_response['Status']['Error']}",
+                    error_code=ErrorCodes.CARD_OPERATION_ERROR)
             
             # Parse the XML response to check the PIN status
             pin_status = parsed_response.get('PinStatus')
@@ -261,13 +314,25 @@ class Konnektor:
                 logger.info(f"PIN verified for card handle: {card_handle}")
                 return True
             else:
-                raise CardException(f"Unexpected PIN status '{pin_status}'")
+                raise CardException(
+                    message=f"Unexpected PIN status '{pin_status}'",
+                    error_code=ErrorCodes.UNEXPECTED_ERROR
+                    )
         except requests.exceptions.RequestException as e:
-            raise CardException(f"Failed to call GetPinStatus: {str(e)}", error_code='REQUEST_FAILED')
+            raise CardException(
+                message=f"Failed to call GetPinStatus: {str(e)}", 
+                error_code=ErrorCodes.KONNEKTOR_REQUEST_FAILED
+                )
         except CardException as e:
-            raise CardException(f"Error during GetPinStatus: {str(e)}", error_code=e.error_code)
+            raise CardException(
+                message=f"Error during GetPinStatus: {str(e)}", 
+                error_code=e.error_code
+                )
         except Exception as e:
-            raise CardException(f"Unexpected Error during GetPinStatus: {str(e)}")
+            raise CardException(
+                message=f"Unexpected Error during GetPinStatus: {str(e)}",
+                error_code=ErrorCodes.UNEXPECTED_ERROR
+                )
 
 
     def create_signed_attest_jwt(self, nonce:str, card_handle:str, card_certificate:str)->str:
@@ -374,6 +439,7 @@ class Konnektor:
         """
         try:
             logger.info("Performing ExternalAuthenticate for card handle: %s", card_handle)
+
             soap_request = SoapClient.generate_xml(
                 SoapClient.Services.AuthSignatureService.AuthSignatureServicePort.ExternalAuthenticate,
                 params={
@@ -402,7 +468,8 @@ class Konnektor:
                 headers={
                     'SOAPAction': '"http://ws.gematik.de/conn/SignatureService/v7.4#ExternalAuthenticate"'
                 },
-                timeout=15
+                timeout=HTTPS_TIMEOUT,
+                allow_redirects=False,
             )
 
             logger.debug("ExternalAuthenticate Response: %s", response.text)
@@ -410,16 +477,24 @@ class Konnektor:
 
             if parsed_response['Status']['Result'] != 'OK' or parsed_response['Status']['Error'] != None:
                 if parsed_response['Status']['Error'] == "Karte nicht als gesteckt identifiziert":
-                    raise CardException(f"{parsed_response['Status']['Error']}", error_code='CARD_NOT_FOUND')
+                    raise CardException(
+                        message=f"{parsed_response['Status']['Error']}", 
+                        error_code=ErrorCodes.CARD_NOT_FOUND
+                        )
                 else:
                     logger.error("Error during ExternalAuthenticate: %s", parsed_response['Status'])
-                    raise KonnektorException(f"Error during ExternalAuthenticate: {parsed_response['Status']}")
+                    raise KonnektorException(
+                        message=f"Error during ExternalAuthenticate: {parsed_response['Status']}",
+                        error_code=ErrorCodes.KONNEKTOR_REQUEST_FAILED
+                        )
             
             type_is_ecdas = parsed_response.get('SignatureObject', {}).get('Base64Signature', {}).get('Type') == 'urn:bsi:tr:03111:ecdsa'
             base64_signature = parsed_response.get('SignatureObject', {}).get('Base64Signature', {}).get('_value_1')
             
             if base64_signature is None:
-                raise ValueError("No Base64Signature found")
+                raise KonnektorException(
+                    message="No Base64Signature found",
+                    error_code=ErrorCodes.SIGNATURE_MISSING)
             
             if type_is_ecdas and base64_signature:
                 try:        
@@ -427,75 +502,24 @@ class Konnektor:
                     base64_signature = convert_der_ecdsa_to_concated_x962(base64_signature)
                     logger.debug("Converted signature to X962: %s", base64_signature)
                 except Exception as e:
-                    raise ValueError("Error processing signature:  %s" % e)
+                    raise KonnektorException(
+                        message=f"Error processing signature:  {e}",
+                        error_code=ErrorCodes.SIGNATURE_PROCESSING_ERROR
+                        )
             
             logger.debug("Base64Signature: %s", base64_signature)
             return base64_signature
         
         except requests.exceptions.RequestException as e:
-            raise KonnektorException(f"Failed to authenticate with Konnektor: {str(e)}")
+            raise KonnektorException(
+                message=f"Failed to authenticate with Konnektor: {str(e)}",
+                error_code=ErrorCodes.KONNEKTOR_REQUEST_FAILED
+                )
         except CardException as e:
             raise e
         except Exception as e:
-            raise KonnektorException(f"Authentication error: {str(e)}")
-
-
-    def get_record_status(self, insurantId: str, endpoint: str) -> Tuple[bool, int, Tuple[int, str]]:
-        """
-        Perform the getRecordStatus operation for the given KVNR at the specified endpoint.
-        See: https://github.com/gematik/ePA-Basic/blob/ePA-3.0.5/src/openapi/I_Information_Service.yaml
-
-        Args:
-            insurantId (str): The insured person's KVNR.
-            endpoint (str): The service endpoint to query.
-
-        Returns:
-            bool: True if the health record exists and is in state ACTIVATED, False otherwise.
-            int: Retry interval in minutes.
-            Tuple[int, str]: Tuple containing the HTTP status code and message.
-        Raises:
-            KonnektorException: If an unexpected response is received.
-            requests.exceptions.RequestException: If the request fails.
-        """
-        try:
-            response = self.session.get(
-                f"{endpoint}/information/api/v1/ehr",
-                headers={
-                    "x-insurantid": insurantId,
-                    "x-useragent": USER_AGENT,
-                    "content-type": "application/json",
-                    "accept": "*/*"
-                },
-                timeout=30
-            )
-            logger.info(f"getRecordStatus response: {response.status_code}, {response.text}")
-
-            if response.status_code == 204:
-                logger.info(f"Ok: Health record exists and is in state ACTIVATED")
-                return True, 24 * 60, (204, "OK")
-            if response.status_code == 404 and response.json().get("errorCode") == "noHealthRecord":
-                logger.info(f"Not found: Health record does not exist (UNKNOWN) or is in state INITIALIZED")
-                return False, 24 * 60, (404, "NOT_FOUND")
-            if response.status_code == 400 and response.json().get("errorCode") == "malformedRequest":
-                # Request does not match schema
-                logger.error(f"Bad Request: Malformed request: {response.status_code}, {response.text}")
-                return False, 24 * 60, (400, "BAD_REQUEST")
-            if response.status_code == 409 and response.json().get("errorCode") == "statusMismatch":
-                # Retry Interval: approx. 24 hours
-                # raise KonnektorException("Conflict", error_code="STATUS_MISMATCH")
-                logger.warning(f"Conflict: Health record is not in state ACTIVATED (i.e. is in state SUSPENDED): {response.status_code}, {response.text}")
-                return False, 24 * 60, (409, "CONFLICT")
-            if response.status_code == 500 and response.json().get("errorCode") == "internalError":
-                # Any other error
-                # Retry Interval: approx. 10 minutes
-                logger.warning(f"Internal Server Error: {response.status_code}, {response.text}")
-                return False, 10, (500, "INTERNAL_SERVER_ERROR")
-
-            raise KonnektorException(f"Unexpected response: {response.status_code}, {response.text}")
-        except requests.exceptions.RequestException as e:
-            raise KonnektorException(f"Error querying getRecordStatus:{e}")
-        except KonnektorException as e:
-            raise e
-        except Exception as e:
-            raise KonnektorException(f"Unexpected error during getRecordStatus: {str(e)}")
+            raise KonnektorException(
+                message=f"Authentication error: {str(e)}",
+                error_code=ErrorCodes.UNEXPECTED_ERROR,
+                )
 

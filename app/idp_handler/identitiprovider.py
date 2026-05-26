@@ -9,9 +9,9 @@ from jwcrypto import common, jwe, jwk, jws
 
 from app.logging_config import logger
 
-from app.constants import IDP_URL, USER_AGENT
+from app.constants import IDP_URL, USER_AGENT, IDP_AUTH_PATH, HTTPS_TIMEOUT
 
-from app.exceptions import IdentitiyProviderException
+from app.exceptions import IdentitiyProviderException, ErrorCodes
 class IdentitiProvider:
     def __init__(self):
         """
@@ -33,11 +33,13 @@ class IdentitiProvider:
         """
         try:
             logger.info("Getting certificates")
-            response = requests.get(IDP_URL + '/certs', timeout=30)
+            response = requests.get(IDP_URL + '/certs', timeout=HTTPS_TIMEOUT)
             logger.debug("Certificates: %s", json.dumps(response.json(), indent=4))
             return response.json()
         except requests.exceptions.RequestException as e:
-            raise IdentitiyProviderException(f"Failed to retrieve certificates: {str(e)}")
+            raise IdentitiyProviderException(
+                message=f"Failed to retrieve certificates: {str(e)}",
+                error_code=ErrorCodes.IDP_REQUEST_ERROR)
 
 
     def get_openid_configuration(self) -> dict:
@@ -51,7 +53,7 @@ class IdentitiProvider:
             requests.exceptions.RequestException: If the configuration cannot be retrieved
         """
         logger.info("Getting OpenID configuration")
-        response = requests.get(IDP_URL + '/.well-known/openid-configuration', timeout=30)
+        response = requests.get(IDP_URL + '/.well-known/openid-configuration', timeout=HTTPS_TIMEOUT)
         logger.debug("OpenID configuration: %s", json.dumps(dict(response.headers), indent=4))
         return dict(response.headers)
     
@@ -70,7 +72,7 @@ class IdentitiProvider:
             requests.exceptions.RequestException: If the key cannot be retrieved
         """
         logger.info("Getting PUK IDP SIG")
-        response = requests.get(self.puk_idp_sig_url, timeout=30)
+        response = requests.get(self.puk_idp_sig_url, timeout=HTTPS_TIMEOUT)
         logger.debug("PUK IDP SIG: %s", json.dumps(response.json(), indent=4))
         return response.text
     
@@ -90,7 +92,7 @@ class IdentitiProvider:
             requests.exceptions.RequestException: If the key cannot be retrieved
         """
         logger.info("Getting PUK IDP ENC")
-        response = requests.get(self.puk_idp_enc_url, timeout=30)
+        response = requests.get(self.puk_idp_enc_url, timeout=HTTPS_TIMEOUT)
         logger.debug("PUK IDP ENC: %s", json.dumps(response.json(), indent=4))
         return response.text
 
@@ -109,7 +111,7 @@ class IdentitiProvider:
             requests.exceptions.RequestException: If the key cannot be retrieved
         """
         logger.info("Getting PUK IDP SEK")
-        response = requests.get(IDP_URL + '/certs/puk_idp_sek', timeout=30)
+        response = requests.get(IDP_URL + '/certs/puk_idp_sek', timeout=HTTPS_TIMEOUT)
         logger.debug("PUK IDP SEK: %s", json.dumps(response.json(), indent=4))
         return response.text
     
@@ -125,7 +127,7 @@ class IdentitiProvider:
         """
         logger.info("Getting discovery configuration")
         try:
-            response = requests.get(IDP_URL + '/.well-known/openid-configuration', timeout=30)
+            response = requests.get(IDP_URL + '/.well-known/openid-configuration', timeout=HTTPS_TIMEOUT)
             response.raise_for_status()
 
             try:
@@ -140,9 +142,16 @@ class IdentitiProvider:
                 return uri_puk_idp_enc, uri_puk_idp_sig
             
             except (ValueError, KeyError) as e:
-                raise IdentitiyProviderException(f"Failed to parse discovery endpoint: {str(e)}")
+                raise IdentitiyProviderException(
+                    message=f"Failed to parse discovery endpoint: {str(e)}",
+                    error_code=ErrorCodes.IDP_VERIFICATION_ERROR
+                    )
         except requests.exceptions.RequestException as e:
-            raise IdentitiyProviderException(f"Failed to retrieve discovery endpoint: {str(e)}")
+            raise IdentitiyProviderException(
+                message=f"Failed to retrieve discovery endpoint: {str(e)}",
+                error_code=ErrorCodes.IDP_REQUEST_ERROR,
+                status_code=503
+                )
             
 
     
@@ -165,7 +174,11 @@ class IdentitiProvider:
         logger.info("Verifying challenge token")
         if not challenge_token:
             logger.error("Challenge token is None")
-            raise IdentitiyProviderException("Challenge token cannot be None")
+            raise IdentitiyProviderException(
+                message="Challenge token cannot be None",
+                error_code=ErrorCodes.IDP_VERIFICATION_ERROR,
+                status_code=400
+                )
         
         # Decode challenge token
         challenge_token_jws = jws.JWS()
@@ -278,7 +291,7 @@ class IdentitiProvider:
             'signed_challenge': encrypted_njwt
         }
 
-        response = requests.post(IDP_URL + '/auth', data=data, timeout=30, allow_redirects=False, headers={
+        response = requests.post(IDP_URL + IDP_AUTH_PATH, data=data, timeout=HTTPS_TIMEOUT, allow_redirects=False, headers={
             "x-useragent": USER_AGENT,
         })
         logger.debug("Auth NJWT response: %s", response.headers)

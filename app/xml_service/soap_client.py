@@ -42,14 +42,16 @@ from app.xml_service.generated_wsdl_classes import (
     CONN_EVENTSERVICE, XDSDOCUMENTSERVICE, WsdlOperation, WsdlService)
 from app.constants import DEFAULT_AS_URL, get_author, get_institution
 
-# Constants
-DIR_PATH = os.path.dirname(os.path.realpath(__file__))
 
 class SoapClient:
     """
     SoapClient class to handle SOAP requests and responses using zeep library.
     """
     max_recursion_depth = 6
+    
+    # Constants
+    DIR_PATH = os.path.dirname(os.path.realpath(__file__))
+
     class Services:
         """
         Class to hold instances of different SOAP services.
@@ -72,7 +74,7 @@ class SoapClient:
         Returns:
             Client: A zeep Client instance configured with the WSDL and settings.
         """
-        wsdl_path = os.path.join(DIR_PATH, *service_identifier.wsdl)
+        wsdl_path = os.path.join(SoapClient.DIR_PATH, *service_identifier.wsdl)
         logger.debug(f"Connecting to WSDL: {wsdl_path}")
 
         settings = Settings(
@@ -170,13 +172,14 @@ class SoapClient:
                         "output": []
                     }
                     if operation.input:
-                        for part in operation.input.body.type.elements:
-                            element_name, element_type = part
-                            operation_data["input"].append({
-                                "name": element_name,
-                                "type": str(element_type),
-                                "input": SoapClient._get_child_nodes(element_type.type, client=client)
-                            })
+                        if hasattr(operation.input.body.type, 'elements'):
+                            for part in operation.input.body.type.elements:
+                                element_name, element_type = part
+                                operation_data["input"].append({
+                                    "name": element_name,
+                                    "type": str(element_type),
+                                    "input": SoapClient._get_child_nodes(element_type.type, client=client)
+                                })
                     if operation.output:
                         for part in operation.output.body.type.elements:
                             element_name, element_type = part
@@ -292,12 +295,7 @@ class SoapClient:
         Returns:
             dict: The parsed response as a dictionary.
         """
-        if response.status_code >= 400:
-            logger.error(f"Response status code: {response.status_code}")
-            return {"Status": {"Result": "Error", "Error": f"HTTP Error {response.status_code}"}}
-
         client = SoapClient.get_client(operation.service)
-        
         # get the service params
         binding = client.wsdl.services[operation.service.name].ports[operation.port].binding
         operation = binding.get(operation.name)
@@ -305,7 +303,12 @@ class SoapClient:
         try:
             # Parse the XML response 
             logger.debug(f"Processing response for operation '{operation.name}': {response.content}")
-            parsed_response = binding.process_reply(client, operation, response)
+            try:
+                parsed_response = binding.process_reply(client, operation, response)
+            except zeep.exceptions.TransportError as e:
+                if response.status_code >= 400:
+                    logger.error(f"Response status code: {response.status_code}")
+                    return {"Status": {"Result": "Error", "Error": f"HTTP Error {response.status_code}"}}
 
             # Convert the parsed response to a dictionary
             parsed_response = serialize_object(parsed_response)
@@ -320,7 +323,8 @@ class SoapClient:
         
         logger.debug(f"Parsed XML of '{operation.name}': {json.dumps(parsed_response, indent=4, default=str)}")
         
-        assert isinstance(parsed_response, dict)
+        if not isinstance(parsed_response, dict):
+            raise ValueError(f"Unexpected response type for operation '{operation.name}': {type(parsed_response)}")
         if 'Status' not in parsed_response: parsed_response["Status"] = {}
         if 'Result' not in parsed_response["Status"]: parsed_response["Status"]["Result"] = "Ok"
         if 'Error' not in parsed_response["Status"]: parsed_response["Status"]["Error"] = None
@@ -364,32 +368,33 @@ class SoapClient:
             "documentEntry": {
                 "uniqueId": f'2.25.{random.randint(10000000, 99999999)}',
                 "languageCode": "de-DE",
-                "mimeType": "application/fhir+xml",
-                "confidentialityCode": [
-                    {
-                        "code": "N",
-                        "displayName": "normal",
-                        "codeSystem": "2.16.840.1.113883.5.25"
-                    }
-                ]
+                # "mimeType": "application/fhir+xml",
+                # "confidentialityCode": [
+                #     {
+                #         "code": "N",
+                #         "displayName": "normal",
+                #         "codeSystem": "2.16.840.1.113883.5.25"
+                #     }
+                # ]
             }
         }
-
-        if input_data["documentEntry"]["URI"].endswith(".xml"):
-            default_input["documentEntry"]["mimeType"] = "application/fhir+xml"
-        elif input_data["documentEntry"]["URI"].endswith(".pdf"):
-            default_input["documentEntry"]["mimeType"] = "application/pdf"
-        else:
-            raise ValueError(
-                f"Unsupported file type for Document URI: {input_data['documentEntry']['URI']}. Supported types are .xml and .pdf."
-            )
+        
+        if input_data["documentEntry"].get("mimeType") is None:
+            if input_data["documentEntry"]["URI"].endswith(".xml"):
+                default_input["documentEntry"]["mimeType"] = "application/fhir+xml"
+            elif input_data["documentEntry"]["URI"].endswith(".pdf"):
+                default_input["documentEntry"]["mimeType"] = "application/pdf"
+            else:
+                raise ValueError(
+                    f"Unsupported file type for Document URI: {input_data['documentEntry']['URI']}. Supported types are .xml and .pdf."
+                )
         
         # Merge default input with user input
         input_data = utils.deep_merge_dicts(default_input, input_data)
         input_data = dict(dict_to_defaultdict(input_data))
         logger.debug(f"Input data: {json.dumps(input_data, indent=4)}")
 
-        for (a, b) in [("documentEntry", "entryUUID"), ("documentEntry", "old_entry_uuid")]:
+        for (a, b) in [("documentEntry", "entryUUID"), ("documentEntry", "oldEntryUUID")]:
             if input_data[a].get(b) is not None and not input_data[a][b].startswith("urn:uuid:"):
                 input_data[a][b] = "urn:uuid:" + input_data[a][b]
         
@@ -507,13 +512,13 @@ class SoapClient:
                 id="documentEntry.Association"
             )]
         
-        # Add RPLC (Replace) Association if old_entry_uuid is present in user_data
-        if 'old_entry_uuid' in input_data["documentEntry"]:
+        # Add RPLC (Replace) Association if oldEntryUUID is present in user_data
+        if 'oldEntryUUID' in input_data["documentEntry"]:
             association.append(
                 AssociationItem(
                     associationType="urn:ihe:iti:2007:AssociationType:RPLC",
                     sourceObject=input_data["documentEntry"]["entryUUID"],
-                    targetObject=input_data["documentEntry"]["old_entry_uuid"],
+                    targetObject=input_data["documentEntry"]["oldEntryUUID"],
                     id="d072a6fc-253a-4206-8047-a6753509e9dd"
             ))
 

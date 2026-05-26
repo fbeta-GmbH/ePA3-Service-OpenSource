@@ -17,23 +17,24 @@ authors = [
 # https://packaging.python.org/en/latest/specifications/dependency-groups/
 # pip install --group default
 default = [
-    "cbor2==5.6.5",
+    "cbor2==5.7.1",
     "coloredlogs==15.0.1",
-    "cryptography==44.0.2",
+    "cryptography==45.0.6",
     "ecdsa==0.19.1",
-    "icecream==2.1.4",
+    "icecream==2.1.8",
     "jinja2==3.1.6",
-    "jsonschema==4.23.0",
+    "jsonschema==4.25.1",
     "jwcrypto==1.5.6",
-    "lxml==5.3.2",
+    "lxml==6.0.2",
     "oqs==0.10.2",
-    "pyjson5==1.6.8",
+    "pyjson5==2.0.0",
     "pymtom_xop==0.0.2",
-    "python-dotenv==1.1.0",
+    "python-dotenv==1.1.1",
     "python-multipart==0.0.20",
-    "requests==2.32.4",
+    "requests==2.32.3",
+    "requests_pkcs12==1.25",
     "zeep==4.3.1",
-    "liboqs-python @ git+https://github.com/open-quantum-safe/liboqs-python.git@9ab93b648e0253087f3c627af3674c058ede391b#egg=liboqs-python"
+    "liboqs-python @ https://github.com/open-quantum-safe/liboqs-python/archive/9ab93b648e0253087f3c627af3674c058ede391b.zip"
 ]
 
 
