@@ -33,6 +33,9 @@ class ErrorCodes:
     DOC_MISSING_DATA = "DOC_MISSING_DATA"
     DOC_UPLOAD_ERROR = "DOC_UPLOAD_ERROR"
     
+    DOC_UPLOAD_DUPLICATE = "DOC_UPLOAD_DUPLICATE"
+    DOC_REPLACE_UUID_ERROR = "DOC_REPLACE_UUID_ERROR"
+    
     # Identity Provider errors
     IDP_VERIFICATION_ERROR = "IDP_VERIFICATION_ERROR"
     IDP_REQUEST_ERROR = "IDP_REQUEST_ERROR"
@@ -86,13 +89,18 @@ class CardException(EPABaseException):
     def __init__(self, message: str, error_code: str = None, status_code: int = HTTPStatus.INTERNAL_SERVER_ERROR):
         super().__init__(message, error_code, status_code)
 
-class IdentitiyProviderException(EPABaseException):
+class IdentityProviderException(EPABaseException):
     """Exceptions related to IDP operations"""
     def __init__(self, message: str, error_code: str = None, status_code: int = HTTPStatus.INTERNAL_SERVER_ERROR):
         super().__init__(message, error_code, status_code)
 
 class AuthenticationException(EPABaseException):
     """Exceptions related to authentication processes"""
+    def __init__(self, message: str, error_code: str = None, status_code: int = HTTPStatus.INTERNAL_SERVER_ERROR):
+        super().__init__(message, error_code, status_code)
+
+class AuthorizationException(EPABaseException):
+    """Exceptions related to authorization and permissions"""
     def __init__(self, message: str, error_code: str = None, status_code: int = HTTPStatus.INTERNAL_SERVER_ERROR):
         super().__init__(message, error_code, status_code)
 

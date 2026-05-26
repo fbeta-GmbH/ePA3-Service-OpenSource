@@ -48,6 +48,7 @@ function Test-IsLibOqsVersionCorrect {
     param ([string]$pathToCheck)
     if (-not $pathToCheck -or -not (Test-Path $pathToCheck)) { return $false, $null }
     $installedOqsVersion = (($pathToCheck -split 'liboqs-')[-1] -split '[\\/]')[0]
+    if (-not ($installedOqsVersion -match '^\d+\.\d+\.\d+$')) { return $false, $null }
     return ([version]$installedOqsVersion -eq [version]$liboqsVersion), $installedOqsVersion
 }
 

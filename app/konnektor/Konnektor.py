@@ -8,7 +8,7 @@ import json
 import sqlite3
 import os
 
-
+from fastapi import status
 from requests import Session
 from requests.adapters import HTTPAdapter
 
@@ -24,7 +24,7 @@ from app.xml_service.soap_client import SoapClient
 
 
 class Konnektor:
-    def __init__(self, path_to_p12:str)->None:
+    def __init__(self, path_to_p12:str, test_conn: bool = True)->None:
         """
         Initialize a new instance of the Konnektor class.
         
@@ -52,11 +52,12 @@ class Konnektor:
         self.db = self.init_db()
         
         try:
-            self.test_connection()
+            if test_conn:
+                self.test_connection()
         except KonnektorException as e:
             logger.error("Failed to initialize Konnektor connection: %s", str(e))
             raise
-        
+    
 
 
     def init_db(self)->sqlite3.Connection:
@@ -80,7 +81,7 @@ class Konnektor:
         """
         try:
             response = self.session.get(f'{KONNEKTOR_URL}/connector.sds', timeout=HTTPS_TIMEOUT)
-            if response.status_code == 200:
+            if response.status_code == status.HTTP_200_OK:
                 logger.info("Konnektor connection test successful")
                 return True
             else:
@@ -112,6 +113,27 @@ class Konnektor:
         
         c = self.db.cursor()
         c.execute("INSERT INTO card_data (card, card_certificate) VALUES (?, ?)", (card, card_certificate))
+        self.db.commit()
+
+
+    def clear_card_data(self)->None:
+        """
+        Clear card data from enviroments and database.
+        """
+        card_env = os.environ.pop("CARD", None)
+        cert_env = os.environ.pop("CARD_CERTIFICATE", None)
+        if card_env:
+            logger.debug("Cleared card handle from environment variables.")
+        if cert_env:
+            logger.debug("Cleared card certificate from environment variables.")
+
+        c = self.db.cursor()
+        c.execute("SELECT card, card_certificate FROM card_data")
+        rows = c.fetchall()
+        if rows:
+            logger.debug(f"Clearing {len(rows)} entries of card data from database.")
+        
+        c.execute("DELETE FROM card_data")
         self.db.commit()
 
 
@@ -167,7 +189,10 @@ class Konnektor:
             parsed_response = SoapClient.parse_xml_response(response, SoapClient.Services.EventService.EventServicePort.GetCards)
 
             if parsed_response.get('Cards') is None:
-                raise CardException("No card available. Is the connection to the Konnektor and the terminal established?")
+                raise CardException(
+                    message="No card available. Is the connection to the Konnektor and the terminal established?",
+                    error_code=ErrorCodes.CARD_NOT_FOUND,
+                )
             
             # Extract the SMC-B card handle
             if parsed_response.get('Cards') is not None:
@@ -180,7 +205,8 @@ class Konnektor:
 
             raise CardException(
                 message="No SMC-B card found. Is the card inserted and the connection to the terminal established?",
-                error_code=ErrorCodes.CARD_NOT_FOUND)
+                error_code=ErrorCodes.CARD_NOT_FOUND,
+            )
         
         except requests.exceptions.RequestException as e:
             raise KonnektorException(
@@ -254,7 +280,10 @@ class Konnektor:
                 error_code=ErrorCodes.CARD_CERTIFICATE_ERROR
                 )
         except Exception as e:
-            raise KonnektorException(f"Error processing certificate: {str(e)}")
+            raise KonnektorException(
+                message=f"Error processing certificate: {str(e)}",
+                error_code=ErrorCodes.CARD_CERTIFICATE_ERROR
+            )
 
     def is_card_pin_verified(self, card_handle: str) -> bool:
         """

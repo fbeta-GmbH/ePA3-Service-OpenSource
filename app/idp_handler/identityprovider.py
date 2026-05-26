@@ -5,28 +5,30 @@ import urllib.parse
 
 import ecdsa
 import requests
+from fastapi import status
 from jwcrypto import common, jwe, jwk, jws
+from typing import Any
 
 from app.logging_config import logger
 
 from app.constants import IDP_URL, USER_AGENT, IDP_AUTH_PATH, HTTPS_TIMEOUT
 
-from app.exceptions import IdentitiyProviderException, ErrorCodes
-class IdentitiProvider:
+from app.exceptions import IdentityProviderException, ErrorCodes
+class IdentityProvider:
     def __init__(self):
         """
-        Initialize a new instance of the IdentitiProvider class.
+        Initialize a new instance of the IdentityProvider class.
         Uses the IDP_URL constant for API endpoint configuration.
         """
-        logger.info("Initializing IdentitiProvider with URL: %s", IDP_URL)
+        logger.info("Initializing IdentityProvider with URL: %s", IDP_URL)
         self.puk_idp_enc_url, self.puk_idp_sig_url = self.get_discovery()
 
-    def get_certs(self) -> json:
+    def get_certs(self) -> dict[str, Any]:
         """
         Retrieve all certificates from the identity provider.
         
         Returns:
-            json: JSON object containing all available certificates
+            dict: JSON dictionary containing all available certificates
             
         Raises:
             requests.exceptions.RequestException: If the certificates cannot be retrieved
@@ -37,7 +39,7 @@ class IdentitiProvider:
             logger.debug("Certificates: %s", json.dumps(response.json(), indent=4))
             return response.json()
         except requests.exceptions.RequestException as e:
-            raise IdentitiyProviderException(
+            raise IdentityProviderException(
                 message=f"Failed to retrieve certificates: {str(e)}",
                 error_code=ErrorCodes.IDP_REQUEST_ERROR)
 
@@ -142,15 +144,15 @@ class IdentitiProvider:
                 return uri_puk_idp_enc, uri_puk_idp_sig
             
             except (ValueError, KeyError) as e:
-                raise IdentitiyProviderException(
+                raise IdentityProviderException(
                     message=f"Failed to parse discovery endpoint: {str(e)}",
                     error_code=ErrorCodes.IDP_VERIFICATION_ERROR
                     )
         except requests.exceptions.RequestException as e:
-            raise IdentitiyProviderException(
+            raise IdentityProviderException(
                 message=f"Failed to retrieve discovery endpoint: {str(e)}",
                 error_code=ErrorCodes.IDP_REQUEST_ERROR,
-                status_code=503
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE
                 )
             
 
@@ -174,10 +176,10 @@ class IdentitiProvider:
         logger.info("Verifying challenge token")
         if not challenge_token:
             logger.error("Challenge token is None")
-            raise IdentitiyProviderException(
+            raise IdentityProviderException(
                 message="Challenge token cannot be None",
                 error_code=ErrorCodes.IDP_VERIFICATION_ERROR,
-                status_code=400
+                status_code=status.HTTP_400_BAD_REQUEST
                 )
         
         # Decode challenge token
@@ -280,8 +282,8 @@ class IdentitiProvider:
         key = jwk.JWK.from_json(puk_idp_enc)
 
         jwe_token = jwe.JWE(json.dumps(outer_payload).encode('utf-8'),
-                    recipient=key,
-                    protected=outer_header)
+                     recipient=key,
+                     protected=outer_header)
         
         encrypted_njwt = jwe_token.serialize(compact=True)
 
