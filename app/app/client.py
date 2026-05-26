@@ -30,9 +30,8 @@ def send_document_to_epa(metadata: dict, document_file_name: str):
 
         
         logger.info("Initializing Konnektor")
-        cert_path = os.path.join(os.path.dirname(__file__),'..', 'data', 'cert.pem')
-        key_path = os.path.join(os.path.dirname(__file__),'..', 'data', 'key.pem')
-        auth = Konnektor.Konnektor(cert_path, key_path)
+        p12_path = os.path.join(os.path.dirname(__file__),'..', 'data', 'KVS_Client_172.026.002.094.p12')
+        auth = Konnektor.Konnektor(p12_path)
 
         logger.info("Initializing IdentitiProvider")
         idp = identitiprovider.IdentitiProvider()
@@ -121,7 +120,7 @@ if __name__ == "__main__":
             "URI": "Testdokument.xml",
             "entryUUID": "urn:uuid:8b7a4223-ce93-49fa-9a9b-3ba2e55279ca"
             # OPTIONAL - If you want to replace a document
-            # "old_entry_uuid": "DocumentEntry_old.entryUUID",
+            # "oldEntryUUID": "DocumentEntry_old.entryUUID",
         }
     }
 

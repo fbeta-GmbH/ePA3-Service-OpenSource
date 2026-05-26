@@ -17,9 +17,10 @@ for key, value in os.environ.items():
         provider_id = key.split("_")[-1]  # Extract the number from the variable name
         RECORD_PROVIDER_MAPPING[provider_name] = int(provider_id)
 
-@dataclass(init=True)
-class EPA_ENV:
+@dataclass
+class EpaEnvConfig:
     """See: https://gemspec.gematik.de/docs/gemSpec/gemSpec_Aktensystem_ePAfueralle/latest/#A_24592-02"""
+    id: str
     name: str
     subdomain : str
     idp_subdomain: str
@@ -34,23 +35,34 @@ class EPA_ENV:
     def get_idp_url(self) -> str:
         return f"https://{self.idp_subdomain}.zentral.idp.splitdns.ti-dienste.de"
 
-EPA_ENVS = {
-    "RU": EPA_ENV(
+class EpaEnvs:
+    RU = EpaEnvConfig(
+        id="RU",
         name="RU1 / RU_ref", 
         subdomain="ref",
         idp_subdomain="idp-ref"
-    ),
-    "RT": EPA_ENV(
+    )
+    RT = EpaEnvConfig(
+        id="RT",
         name="RU2 / RU_dev", 
         subdomain="dev",
         idp_subdomain="idp-ref"
-    ),
-    "PROD": EPA_ENV(
+    )
+    PROD = EpaEnvConfig(
+        id="PROD",
         name="PROD", 
         subdomain="prod",
         idp_subdomain="idp"
     )
-}
+
+    @classmethod
+    def available_envs(cls) -> list[str]:
+        return [env.id for env in vars(cls).values() if isinstance(env, EpaEnvConfig)]
+
+    @classmethod
+    def get(cls, env_name: str) -> EpaEnvConfig:
+        return getattr(cls, env_name)
+
 
 def generate_author() -> str:
     telematik_id = os.getenv('TELEMATIK_ID')
@@ -111,19 +123,18 @@ def get_institution() -> str:
     return os.getenv('INSTITUTION')
 
 EPA_ENVIRONMENT = os.getenv('EPA_ENVIRONMENT', 'RT').upper()
-if EPA_ENVIRONMENT not in EPA_ENVS:
-    raise ValueError(f"Invalid EPA_ENVIRONMENT: {EPA_ENVIRONMENT}")
+if EPA_ENVIRONMENT not in EpaEnvs.available_envs():
+    raise ValueError(f"Invalid EPA_ENVIRONMENT: {EPA_ENVIRONMENT}. (Available environments are: {', '.join(EpaEnvs.available_envs())})")
 
 def get_as_url(provider_id: str) -> str:
-    return EPA_ENVS[EPA_ENVIRONMENT].get_as_url(provider_id)
+    return EpaEnvs.get(EPA_ENVIRONMENT).get_as_url(provider_id)
 
 
 DEFAULT_EPA_PROVIDER_ID = os.getenv('DEFAULT_EPA_PROVIDER_ID', '2')
 DEFAULT_AS_URL = get_as_url(str(DEFAULT_EPA_PROVIDER_ID))
-IDP_URL = EPA_ENVS[EPA_ENVIRONMENT].get_idp_url()
+IDP_URL = EpaEnvs.get(EPA_ENVIRONMENT).get_idp_url()
 
 USER_AGENT = os.getenv('USER_AGENT')
-KONNEKTOR_URL = os.getenv('KONNEKTOR_URL')
 
 DIGA_NAME = os.getenv('DIGA_NAME')
 DIGA_MANUFACTURER = os.getenv('DIGA_MANUFACTURER')
@@ -136,6 +147,12 @@ CLIENT_SYSTEM_ID = os.getenv('CLIENT_SYSTEM_ID')
 WORKPLACE_ID = os.getenv('WORKPLACE_ID')
 USER_ID = os.getenv('USER_ID')
 
+KONNEKTOR_CERT_PW = os.getenv('KONNEKTOR_CERT_PW')
+
+HTTPS_TIMEOUT = int(os.getenv('HTTPS_TIMEOUT', '30'))
+
+IDP_AUTH_PATH = "/auth"
+KONNEKTOR_URL = os.getenv('KONNEKTOR_URL') 
 
 logger.info(f"""
 Constants loaded:
