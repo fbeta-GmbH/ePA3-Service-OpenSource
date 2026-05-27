@@ -199,10 +199,13 @@ class IdentityProvider:
         # Split challenge token into data and signature parts
         header, payload, signature = challenge_token.split('.')
 
-        data_bytes =  (header + '.' + payload).encode()
+        data_bytes = (header + '.' + payload).encode()
         signature_bytes = common.base64url_decode(signature)
         if len(signature_bytes) != 64:
-            logger.error("Challenge token signature has unexpected length")
+            logger.error(
+                "Challenge token signature has unexpected length: expected 64 bytes, got %d",
+                len(signature_bytes),
+            )
             return False
         r = int.from_bytes(signature_bytes[:32], "big")
         s = int.from_bytes(signature_bytes[32:], "big")
@@ -216,7 +219,7 @@ class IdentityProvider:
             public_key.verify(der_signature, data_bytes, ec.ECDSA(hashes.SHA256()))
             logger.info("Challenge token signature verified successfully")
             return True
-        except (InvalidSignature, ValueError, TypeError):
+        except InvalidSignature:
             logger.error("Challenge token signature verification failed")
             return False
         
