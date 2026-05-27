@@ -1,5 +1,3 @@
-import ecdsa
-from hashlib import sha256
 import base64
 import time
 import requests

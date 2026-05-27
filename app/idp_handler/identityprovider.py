@@ -1,11 +1,14 @@
 import base64
-import hashlib
 import json
 import urllib.parse
 
-import ecdsa
 import requests
 from fastapi import status
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
+from cryptography.hazmat.primitives.serialization import load_pem_public_key
+from cryptography.exceptions import InvalidSignature
 from jwcrypto import common, jwe, jwk, jws
 from typing import Any
 
@@ -191,24 +194,29 @@ class IdentityProvider:
         public_key_json = json.loads(self.get_puk_idp_sig())
         public_key_jwk = jwk.JWK(**public_key_json)
 
-        # create a verifying key with correct signature algorithm and hash function from the given public key
-        verifying_key = ecdsa.VerifyingKey.from_pem(public_key_jwk.export_to_pem(), hashfunc=hashlib.sha256)
+        public_key = load_pem_public_key(public_key_jwk.export_to_pem())
 
         # Split challenge token into data and signature parts
         header, payload, signature = challenge_token.split('.')
 
         data_bytes =  (header + '.' + payload).encode()
         signature_bytes = common.base64url_decode(signature)
+        if len(signature_bytes) != 64:
+            logger.error("Challenge token signature has unexpected length")
+            return False
+        r = int.from_bytes(signature_bytes[:32], "big")
+        s = int.from_bytes(signature_bytes[32:], "big")
+        der_signature = encode_dss_signature(r, s)
 
         logger.debug("Data bytes: %s", data_bytes)
         logger.debug("Signature bytes: %s", signature_bytes)
         
         # use the verifying key to verify the signature with the data 
         try:
-            verifying_key.verify(signature_bytes, data_bytes)
+            public_key.verify(der_signature, data_bytes, ec.ECDSA(hashes.SHA256()))
             logger.info("Challenge token signature verified successfully")
             return True
-        except ecdsa.BadSignatureError:
+        except (InvalidSignature, ValueError, TypeError):
             logger.error("Challenge token signature verification failed")
             return False
         
@@ -306,4 +314,3 @@ class IdentityProvider:
         auth_code = response_queries['code'][0]
 
         return auth_code
-
