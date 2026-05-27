@@ -17,6 +17,7 @@ authors = [
 # https://packaging.python.org/en/latest/specifications/dependency-groups/
 # pip install --group default
 default = [
+    "asn1crypto==1.5.1",
     "cbor2==5.9.0",
     "coloredlogs==15.0.1",
     "cryptography==48.0.0",
@@ -28,6 +29,7 @@ default = [
     "jwcrypto==1.5.7",
     "lxml==6.1.0",
     "oqs==0.10.2",
+    "pyhanko_certvalidator==0.26.3",
     "pyjson5==2.0.0",
     "pymtom_xop==0.0.2",
     "python-dotenv==1.2.2",

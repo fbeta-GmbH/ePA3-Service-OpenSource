@@ -146,6 +146,22 @@ kon_ts = Konnektor_Truststore(
 )
 KONNEKTOR_CA_BUNDLE = kon_ts.build_ca_bundle()
 
+if KONNEKTOR_CA_BUNDLE and KONNEKTOR_JWS_URL:
+    logger.info("Konnektor identity verification is ENABLED.")
+elif KONNEKTOR_CA_BUNDLE:
+    logger.warning(
+        f"Konnektor identity verification is ENABLED using existing certificate bundle at {KONNEKTOR_CA_BUNDLE}, but KONNEKTOR_JWS_URL is not set, so automatic refresh of the bundle is not available. \n"
+        "To enable automatic refresh, set KONNEKTOR_JWS_URL in your .env file (see .env.template for details)."
+    )
+else:
+    logger.error(
+        "Konnektor identity verification is DISABLED - the service cannot confirm it is talking to the real Konnektor. "
+        "This is NOT recommended for production use. \n"
+        "To enable it, set KONNEKTOR_JWS_URL in your .env file (see .env.template for details)."
+    )
+
+TI_PKI_ROOTS_DIR = ti_ts.get_root_ca_path()
+
 
 logger.info(f"""
 Constants loaded:
