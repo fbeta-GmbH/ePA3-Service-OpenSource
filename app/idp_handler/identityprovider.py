@@ -201,6 +201,7 @@ class IdentityProvider:
 
         data_bytes = (header + '.' + payload).encode()
         signature_bytes = common.base64url_decode(signature)
+        # JWS P-256 signatures are 64-byte raw values (r||s), 32 bytes each.
         if len(signature_bytes) != 64:
             logger.error(
                 "Challenge token signature has unexpected length: expected 64 bytes, got %d",
@@ -209,6 +210,7 @@ class IdentityProvider:
             return False
         r = int.from_bytes(signature_bytes[:32], "big")
         s = int.from_bytes(signature_bytes[32:], "big")
+        # cryptography expects ASN.1 DER encoded ECDSA signatures for verification.
         der_signature = encode_dss_signature(r, s)
 
         logger.debug("Data bytes: %s", data_bytes)
