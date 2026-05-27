@@ -20,17 +20,10 @@ from cryptography import x509
 from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
 from base64 import b64encode
 from fastapi import status
-from cryptography.hazmat.primitives import hashes
-from cryptography.exceptions import InvalidSignature
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives import hashes
-
-from urllib.parse import urljoin
 
 from app.logging_config import logger
 
-from app.vau import kemvau, utils
+from app.vau import kemvau, utils, validator
 from app.runtime_config.constants import USER_AGENT, EPA_ENVIRONMENT, HTTPS_TIMEOUT, TI_CA_BUNDLE, EpaEnvs
 
 from app.exceptions import DocumentException, VAUException, AuthorizationException, AuthenticationException, ErrorCodes
@@ -78,6 +71,8 @@ class VAUKanal:
             self.sanitized_user_agent = utils.sanitize_header_value(USER_AGENT)
 
             self.https_session = requests.Session()
+            
+            self.vau_cert_validator = validator.VAUCertificateValidator(AS_URL=self.AS_URL, https_session=self.https_session)
 
             # VauMessage 1:
             # Der Client erzeugt die ECDH und Kyber KeyPairs und packt sie in Message 1:
@@ -159,7 +154,7 @@ class VAUKanal:
 
             logger.info(signed_vau_server_pub_keys)
 
-            self.vau_cert_validation(signed_vau_server_pub_keys)
+            self.vau_cert_validator.validate(signed_vau_server_pub_keys)
 
             pub_keys = cbor2.loads(signed_vau_server_pub_keys["signed_pub_keys"])
 
@@ -237,121 +232,13 @@ class VAUKanal:
             nachricht_4_encoded = http_response.content
 
             logger.info("----------------------VAU-KANAL ERFOLGREICH AUFGEBAUT----------------------")
+        except VAUException:
+            raise    
         except Exception as e:
             logger.error("Unexpected error during building of VAU-Kanal: %s", str(e))
             raise VAUException(
                 message=f"Building VAU-Kanal Failed: {str(e)}",
                 error_code=ErrorCodes.VAU_AUTH_FAILED,
-                status_code=status.HTTP_502_BAD_GATEWAY
-            )
-
-    def vau_cert_validation(self, signed_vau_server_pub_keys: dict) -> bool:
-        """
-        Validates the VAU server's signed public keys by verifying the signature using the server certificate.
-        It retrieves certificate data from the server, loads and validates the certificate chain,
-        and uses the public key to verify the signature on the signed public keys.
-
-        Args:
-                signed_vau_server_pub_keys (dict): Dictionary containing cert_hash, cdv, signature and signed public keys
-
-        Returns:
-                bool: True if validation succeeds, False otherwise
-
-        Raises:
-                Various exceptions during certificate validation or signature verification
-        """
-
-        logger.info(signed_vau_server_pub_keys["cert_hash"])
-
-        cert_hash = signed_vau_server_pub_keys["cert_hash"]
-
-        logger.info(f"Cert hash 64: {cert_hash}")
-
-        cert_hash_hex = cert_hash.hex()
-
-        logger.info(f"Cert hash hex: {cert_hash_hex}")
-
-        cdv = signed_vau_server_pub_keys["cdv"]
-
-        # Request CertData from server
-
-        cert_endpoint = urljoin(self.AS_URL, f"/CertData.{cert_hash_hex}-{cdv}")
-
-        cert_data_response = self.https_session.get(
-            cert_endpoint,
-            verify=TI_CA_BUNDLE,
-            headers={"x-useragent": self.sanitized_user_agent},
-        )
-
-        logger.info(f"Requested CertData from {cert_endpoint}, status code: {cert_data_response.status_code}")
-        logger.debug(f"CertData response headers: {cert_data_response.headers}")
-
-        if cert_data_response.status_code != status.HTTP_200_OK:
-            logger.error(f"Failed to retrieve CertData: {cert_data_response.text}")
-            return False
-
-        try:
-            # Parse CBOR response
-            cert_data = cbor2.loads(cert_data_response.content)
-
-            # Validate structure
-            required_fields = ["cert", "ca", "rca_chain"]
-            if not all(field in cert_data for field in required_fields):
-                logger.error("Missing required fields in CertData")
-                return False
-
-            try:
-                # Load the end-entity certificate
-                cert = x509.load_der_x509_certificate(
-                    cert_data["cert"], default_backend()
-                )
-
-                # Get the public key from the certificate
-                public_key = cert.public_key()
-
-                if not isinstance(public_key, ec.EllipticCurvePublicKey):
-                    logger.error("Certificate public key is not an EC key")
-                    return False
-
-                r = int.from_bytes(
-                    signed_vau_server_pub_keys["signature-ES256"][:32], byteorder="big"
-                )
-                s = int.from_bytes(
-                    signed_vau_server_pub_keys["signature-ES256"][32:], byteorder="big"
-                )
-                # Encode to DER format
-                signature_der = encode_dss_signature(r, s)
-
-                # Verify the signature
-                public_key.verify(
-                    signature_der,
-                    signed_vau_server_pub_keys["signed_pub_keys"],
-                    ec.ECDSA(hashes.SHA256()),
-                )
-
-                logger.info("✓ Signature verification successful")
-                return True
-
-            except InvalidSignature:
-                logger.error("✗ Invalid signature on signed public keys")
-                raise VAUException(
-                    message="Invalid signature on signed public keys",
-                    error_code=ErrorCodes.VAU_CERT_VALIDATION_FAILED,
-                    status_code=status.HTTP_502_BAD_GATEWAY
-                )
-            except Exception as e:
-                logger.error(f"✗ Error during signature verification: {str(e)}")
-                raise VAUException(
-                    message=f"Error during signature verification: {str(e)}",
-                    error_code=ErrorCodes.VAU_CERT_VALIDATION_FAILED,
-                    status_code=status.HTTP_502_BAD_GATEWAY
-                )
-
-        except Exception as e:
-            logger.error(f"✗ Certificate validation failed: {str(e)}")
-            raise VAUException(
-                message=f"Certificate validation failed: {str(e)}",
-                error_code=ErrorCodes.VAU_CERT_VALIDATION_FAILED,
                 status_code=status.HTTP_502_BAD_GATEWAY
             )
 
