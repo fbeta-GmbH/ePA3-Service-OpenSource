@@ -73,8 +73,9 @@ class VAUKanal:
             assert self.AS_URL.startswith("http://") or self.AS_URL.startswith("https://")
 
             AS_URL_START_VAU = self.AS_URL + "/VAU"
-
-            self.host = parse.urlparse(self.AS_URL).netloc
+    
+            self.sanitized_host = utils.sanitize_header_value(parse.urlparse(self.AS_URL).netloc)
+            self.sanitized_user_agent = utils.sanitize_header_value(USER_AGENT)
 
             self.https_session = requests.Session()
 
@@ -96,7 +97,7 @@ class VAUKanal:
                     AS_URL_START_VAU,
                     headers={
                         "Content-Type": "application/cbor",
-                        "x-useragent": USER_AGENT,
+                        "x-useragent": self.sanitized_user_agent,
                     },
                     data=nachricht_1_encoded,
                     timeout=HTTPS_TIMEOUT*2,
@@ -201,7 +202,7 @@ class VAUKanal:
                     self.as_url_plus_vau_cid,
                     headers={
                         "Content-Type": "application/cbor",
-                        "x-useragent": USER_AGENT,
+                        "x-useragent": self.sanitized_user_agent,
                     },
                     data=nachricht_3_encoded,
                     timeout=HTTPS_TIMEOUT,
@@ -279,7 +280,7 @@ class VAUKanal:
         cert_data_response = self.https_session.get(
             cert_endpoint,
             verify=TI_CA_BUNDLE,
-            headers={"x-useragent": USER_AGENT},
+            headers={"x-useragent": self.sanitized_user_agent},
         )
 
         logger.info(f"Requested CertData from {cert_endpoint}, status code: {cert_data_response.status_code}")
@@ -436,7 +437,7 @@ class VAUKanal:
             # Send request
             headers = {
                 "Content-Type": "application/octet-stream",
-                "x-useragent": USER_AGENT,
+                "x-useragent": self.sanitized_user_agent,
             }
 
             # If not PU, then add VAU-nonPU-Tracing in Header
@@ -568,17 +569,25 @@ class VAUKanal:
         Builds the inner HTTP header for a VAU message.
         """
         logger.info("=== Building inner HTTP header ===")
-        inner_header = (
-            f"{uri} HTTP/1.1\r\n"
-            f"Host: {self.host}\r\n" +
-            (f"Accept: {accept_type}\r\n" if accept_type is not None else "") +
-            (f"Content-Type: {content_type}\r\n" if content_type is not None else "") +
-            (f"Content-Length: {content_length}\r\n" if content_length is not None else "") +
-            f"x-useragent: {USER_AGENT}\r\n"
-            f"x-insurantid: {insurant_id}\r\n"
-            "\r\n"
-        )
-        return inner_header
+        try:
+            inner_header = (
+                f"{utils.sanitize_header_value(uri)} HTTP/1.1\r\n"
+                f"Host: {self.sanitized_host}\r\n" +
+                (f"Accept: {utils.sanitize_header_value(accept_type)}\r\n" if accept_type is not None else "") +
+                (f"Content-Type: {utils.sanitize_header_value(content_type)}\r\n" if content_type is not None else "") +
+                (f"Content-Length: {utils.sanitize_header_value(str(content_length))}\r\n" if content_length is not None else "") +
+                f"x-useragent: {self.sanitized_user_agent}\r\n"
+                f"x-insurantid: {utils.sanitize_header_value(utils.validate_insurant_id(insurant_id))}\r\n"
+                "\r\n"
+            )
+            return inner_header 
+        except ValueError as e:
+            logger.error("Error building inner HTTP header: %s", str(e))
+            raise VAUException(
+                message=f"Error building inner HTTP header: {str(e)}",
+                error_code=ErrorCodes.VAU_COMMUNICATION_ERROR,
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
 
     def get_nonce(self, insurant_id: str) -> str:
         logger.info("=== Getting Nonce ===")
@@ -667,7 +676,7 @@ class VAUKanal:
                 new_uri,
                 headers={
                     "Content-Type": "application/octet-stream",
-                    "x-useragent": USER_AGENT,
+                    "x-useragent": utils.sanitize_header_value(USER_AGENT),
                 },
                 timeout=HTTPS_TIMEOUT,
                 verify=TI_CA_BUNDLE,
@@ -774,7 +783,7 @@ class VAUKanal:
 
             logger.info("Uploading document")
 
-            content_type = f'multipart/related;start-info="application/soap+xml";type="application/xop+xml";action="urn:ihe:iti:2007:ProvideAndRegisterDocumentSet-b";boundary={boundary_string}'
+            content_type = f'multipart/related;start-info="application/soap+xml";type="application/xop+xml";action="urn:ihe:iti:2007:ProvideAndRegisterDocumentSet-b";boundary={utils.sanitize_header_value(boundary_string)}'
 
             body = soap_message
 
