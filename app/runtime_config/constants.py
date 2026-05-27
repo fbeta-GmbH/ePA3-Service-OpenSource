@@ -3,6 +3,9 @@ import os
 from app.runtime_config.bootstrap import _APP_ROOT, USER_CONFIG_DIR, load_env
 from app.logging_config import logger
 from app.runtime_config.epa_env import EpaEnvs
+from app.truststores.ti.ti_truststore import TI_Truststore
+from app.truststores.konnektor.konnektor_truststore import Konnektor_Truststore
+from app.konnektor.pkcs12adapter import find_p12
 
 load_env()
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -104,11 +107,11 @@ WORKPLACE_ID = os.getenv('WORKPLACE_ID')
 USER_ID = os.getenv('USER_ID')
 
 KONNEKTOR_CERT_PW = os.getenv('KONNEKTOR_CERT_PW')
-KONNEKTOR_JWS_URL = os.getenv("KONNEKTOR_JWS_URL", "")
 """
 URL to a JWS file published by the Konnektor provider, containing trusted server certificates, used to verify the identity of the Konnektor. 
 If empty, TLS server verification is disabled (verify=False) in all Konnektor requests.
 """
+KONNEKTOR_JWS_URL = os.getenv("KONNEKTOR_JWS_URL", "")
 
 HTTPS_TIMEOUT = int(os.getenv('HTTPS_TIMEOUT', '30'))
 
@@ -119,6 +122,30 @@ if KONNEKTOR_CERT_PW is None:
     raise ValueError("KONNEKTOR_CERT_PW is not set. Please set it in your .env file.")
 if not KONNEKTOR_URL:
     raise ValueError("KONNEKTOR_URL is not set. Please set it in your .env file.")
+
+
+# === Loading CA-Bundles from truststores ===
+ti_ts = TI_Truststore(
+    ca_path=os.getenv('TI_CA_BUNDLE_PATH', os.path.join(_APP_ROOT, 'app', 'tmp', 'ti-ca')),
+    epa_envs=epa_envs,
+    provider_mapping=RECORD_PROVIDER_MAPPING,
+    https_timeout=HTTPS_TIMEOUT,
+)
+
+TI_CA_BUNDLE = ti_ts.build_ca_bundle()
+
+# Build the Konnektor CA bundle from the JWS-provided server certificates.
+kon_ts = Konnektor_Truststore(
+    ca_bundle_path=os.getenv('KONNEKTOR_CA_BUNDLE', os.path.join(_APP_ROOT, 'app', 'tmp', 'konnektor-ca')),
+    epa_envs=epa_envs,
+    konnektor_url=KONNEKTOR_URL,
+    konnektor_jws_url=KONNEKTOR_JWS_URL,
+    p12_path=find_p12(USER_CONFIG_DIR),
+    p12_password=KONNEKTOR_CERT_PW,
+    https_timeout=HTTPS_TIMEOUT,
+)
+KONNEKTOR_CA_BUNDLE = kon_ts.build_ca_bundle()
+
 
 logger.info(f"""
 Constants loaded:

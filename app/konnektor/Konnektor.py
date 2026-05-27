@@ -15,10 +15,12 @@ from requests.adapters import HTTPAdapter
 from app.logging_config import logger
 
 from app.utils.utils import convert_der_ecdsa_to_concated_x962
-from app.runtime_config.constants import MANDANT_ID, CLIENT_SYSTEM_ID, USER_AGENT, WORKPLACE_ID, HTTPS_TIMEOUT, USER_ID, DIGA_NAME, DIGA_MANUFACTURER, KONNEKTOR_URL, KONNEKTOR_CERT_PW
+from app.runtime_config.constants import MANDANT_ID, CLIENT_SYSTEM_ID, USER_AGENT, WORKPLACE_ID, HTTPS_TIMEOUT, USER_ID, DIGA_NAME, DIGA_MANUFACTURER, KONNEKTOR_URL, KONNEKTOR_CERT_PW, KONNEKTOR_CA_BUNDLE
 
 from app.exceptions import KonnektorException, CardException, ErrorCodes
 from app.xml_service.soap_client import SoapClient
+
+from app.konnektor.pkcs12adapter import PinnedPkcs12Adapter
 
 
 
@@ -36,9 +38,11 @@ class Konnektor:
 
         self.session = Session()
 
-        pkcs12_adapter = requests_pkcs12.Pkcs12Adapter(
+        ca_bundle = KONNEKTOR_CA_BUNDLE if isinstance(KONNEKTOR_CA_BUNDLE, str) else None
+        pkcs12_adapter = PinnedPkcs12Adapter(
             pkcs12_filename=self.path_to_p12,
-            pkcs12_password=self.cert_password
+            pkcs12_password=self.cert_password,
+            ca_bundle=ca_bundle,
         )
 
         self.session.mount("https://", pkcs12_adapter)
@@ -46,7 +50,7 @@ class Konnektor:
         self.session.headers.update({
             'Content-Type': 'application/xml',
         })
-        self.session.verify = False
+        self.session.verify = KONNEKTOR_CA_BUNDLE if KONNEKTOR_CA_BUNDLE else False
 
         self.db = self.init_db()
         

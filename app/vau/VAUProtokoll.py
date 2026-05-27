@@ -31,7 +31,7 @@ from urllib.parse import urljoin
 from app.logging_config import logger
 
 from app.vau import kemvau, utils
-from app.runtime_config.constants import USER_AGENT, EPA_ENVIRONMENT, HTTPS_TIMEOUT, EpaEnvs
+from app.runtime_config.constants import USER_AGENT, EPA_ENVIRONMENT, HTTPS_TIMEOUT, TI_CA_BUNDLE, EpaEnvs
 
 from app.exceptions import DocumentException, VAUException, AuthorizationException, AuthenticationException, ErrorCodes
 
@@ -100,7 +100,7 @@ class VAUKanal:
                     data=nachricht_1_encoded,
                     timeout=HTTPS_TIMEOUT*2,
                     # Um ein VAU-Kanal zu https://epa-as-2.dev.epa4all.de/ aufzubauen muss verify auf False gesetzt werden, da es sich um ein self-signed Zertifikat handelt
-                    verify=False,
+                    verify=TI_CA_BUNDLE,
                 )
             except Exception as e:
                 raise VAUException(
@@ -205,7 +205,7 @@ class VAUKanal:
                     data=nachricht_3_encoded,
                     timeout=HTTPS_TIMEOUT,
                     # Um ein VAU-Kanal zu https://epa-as-2.dev.epa4all.de/ aufzubauen muss verify auf False gesetzt werden, da es sich um ein self-signed Zertifikat handelt
-                    verify=False,
+                    verify=TI_CA_BUNDLE,
                 )
             except Exception as e:
                 raise VAUException(
@@ -277,7 +277,7 @@ class VAUKanal:
 
         cert_data_response = self.https_session.get(
             cert_endpoint,
-            verify=False,
+            verify=TI_CA_BUNDLE,
             headers={"x-useragent": USER_AGENT},
         )
 
@@ -455,7 +455,7 @@ class VAUKanal:
                 headers=headers,
                 data=message,
                 timeout=HTTPS_TIMEOUT,
-                verify=False,
+                verify=TI_CA_BUNDLE,
             )
 
             # Get response data
@@ -666,7 +666,7 @@ class VAUKanal:
                     "x-useragent": USER_AGENT,
                 },
                 timeout=HTTPS_TIMEOUT,
-                verify=False,
+                verify=TI_CA_BUNDLE,
             )
 
             logger.debug("HTTP Content: %s", http_response.content)
