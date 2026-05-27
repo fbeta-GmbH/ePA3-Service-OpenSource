@@ -113,7 +113,6 @@ if __name__ == "__main__":
     logger.info("Starting ePA client")
 
     sample_metadata = {
-        # "insurantId": "X110580673",
         "insurantId": "X99999999",
         "documentEntry": {
             "creationTime": "20230609115053",

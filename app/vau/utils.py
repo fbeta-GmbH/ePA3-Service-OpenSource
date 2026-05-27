@@ -1,7 +1,18 @@
 import json
+import re
 from app.exceptions import ErrorCodes, DocumentException, AuthorizationException
 from fastapi import status
 
+
+def sanitize_header_value(value: str) -> str:
+    if '\r' in value or '\n' in value or '\x00' in value:
+        raise ValueError("Invalid header value: contains CRLF or NUL characters")
+    return value
+
+def validate_insurant_id(insurant_id: str) -> str:
+    if not re.match(r'^[A-Z]\d{9}$', insurant_id):
+        raise ValueError(f"Invalid Insurant ID format: {insurant_id}")
+    return insurant_id
 
 def check_upload_response_for_errors(response_body:dict) -> None:
     """
