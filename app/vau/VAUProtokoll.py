@@ -67,6 +67,7 @@ class VAUKanal:
 
             self.encryption_counter = 0
             self.request_counter = 0
+            self.last_response_counter = 0
 
             assert self.AS_URL
             assert self.AS_URL.startswith("http://") or self.AS_URL.startswith("https://")
@@ -413,6 +414,7 @@ class VAUKanal:
         http_response = None
         try:
             self.encryption_counter += 1
+            self.request_counter += 1
             random_4_bytes = secrets.token_bytes(4)
             iv = random_4_bytes + self.encryption_counter.to_bytes(8, "big")
 
@@ -511,12 +513,14 @@ class VAUKanal:
                     error_code=ErrorCodes.VAU_COMMUNICATION_ERROR,
                     status_code=status.HTTP_502_BAD_GATEWAY
                 )
-            if resp_counter != self.request_counter:
+            if resp_counter <= self.last_response_counter:
                 raise VAUException(
                     message="Invalid response counter in VAU response",
                     error_code=ErrorCodes.VAU_COMMUNICATION_ERROR,
                     status_code=status.HTTP_502_BAD_GATEWAY
                 )
+            self.last_response_counter = resp_counter
+            
             if resp_keyid != self.c_key_id:
                 raise VAUException(
                     message="Unknown KeyID in VAU response",
