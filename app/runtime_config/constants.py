@@ -16,6 +16,31 @@ for key, value in os.environ.items():
         RECORD_PROVIDER_MAPPING[provider_name] = int(provider_id)
 
 
+# DiGA professionOID - all other OIDs are treated as LE (Leistungserbringer)
+# See: gemSpec_OID Tab_PKI_403 (oid_diga = DiGA-Hersteller und -Anbieter)
+#   https://gemspec.gematik.de/docs/gemSpec/gemSpec_OID/latest/#polarion___2
+DIGA_PROFESSION_OID = '1.2.276.0.76.4.282'
+
+# Mapping of SMC-B professionOID to healthcareFacilityTypeCode
+# ProfessionOIDs: gemSpec_OID V3.23.0 Tab_PKI_403 (OID-Festlegung Institutionen im X.509-Zertifikat der SMC-B)
+#   https://gemspec.gematik.de/docs/gemSpec/gemSpec_OID/latest/#polarion___2
+# FacilityTypeCodes: https://wiki.hl7.de/index.php?title=IG:Value_Sets_f%C3%BCr_XDS#DocumentEntry.healthcareFacilityTypeCode
+PROFESSION_OID_TO_FACILITY = {
+    '1.2.276.0.76.4.50': 'PRA',   # Betriebsstätte Arzt
+    '1.2.276.0.76.4.51': 'PRA',   # Zahnarztpraxis
+    '1.2.276.0.76.4.52': 'PRA',   # Betriebsstätte Psychotherapeut
+    '1.2.276.0.76.4.53': 'KHS',   # Krankenhaus
+    '1.2.276.0.76.4.54': 'APO',   # Öffentliche Apotheke
+    '1.2.276.0.76.4.55': 'APO',   # Krankenhausapotheke
+    '1.2.276.0.76.4.56': 'APO',   # Bundeswehrapotheke
+    '1.2.276.0.76.4.282': 'PAT',  # DiGA-Hersteller und -Anbieter
+}
+
+def is_le() -> bool:
+    """Check if the current SMC-B card belongs to a Leistungserbringer (non-DiGA)."""
+    return os.getenv('OID_DIGA', DIGA_PROFESSION_OID) != DIGA_PROFESSION_OID
+
+# --- DiGA author/institution generation ---
 
 def generate_author() -> str:
     telematik_id = os.getenv('TELEMATIK_ID')
@@ -37,25 +62,82 @@ def generate_institution() -> str:
     institution = f"{diga_manufacturer}^^^^^&1.2.276.0.76.4.188&ISO^^^^{telematik_id}"
     return institution
 
+# --- Leistungserbringer (doctor) author/institution generation ---
+
+def generate_author_le() -> str:
+    # XCN format per IHE ITI TF-3 §4.2.3.1.7 / gemSpec A_14763-03
+    # surName/givenName/title only available in KBV-sector SMC-B certs (Arztpraxis)
+    lanr = os.getenv('LANR', '')
+    surname = os.getenv('AUTHOR_SURNAME', '') or os.getenv('CERT_SURNAME', '')
+    given_name = os.getenv('AUTHOR_GIVEN_NAME', '') or os.getenv('CERT_GIVEN_NAME', '')
+    title = os.getenv('AUTHOR_TITLE', '') or os.getenv('CERT_TITLE', '')
+    # Assigning authority (LANR registry OID) - only include when LANR is set
+    if lanr:
+        assigning_authority = "&1.2.276.0.76.4.16&ISO"
+    else:
+        assigning_authority = ''
+    if not surname:
+        surname = os.getenv('ORG_NAME', '')
+    author = f"{lanr}^{surname}^{given_name}^^^{title}^^^{assigning_authority}"
+    return author
+
+def generate_institution_le() -> str:
+    # XON format per IHE ITI TF-3 §4.2.3.1.7
+    # Assigning authority OID 1.2.276.0.76.4.188 = Telematik-ID domain
+    telematik_id = os.getenv('TELEMATIK_ID')
+    org_name = os.getenv('ORG_NAME', '')
+    institution = f"{org_name}^^^^^&1.2.276.0.76.4.188&ISO^^^^{telematik_id}"
+    return institution
+
 def set_telematik_id(telematik_id: str, ):
     os.environ['TELEMATIK_ID'] = telematik_id
 
-def set_oid_diga(oid_diga: str):
-    os.environ['OID_DIGA'] = oid_diga
+def set_cert_author_fields(cert_data):
+    """Extract actor type, facility type, and author fields from SMC-B certificate.
+    Sets OID_DIGA, HEALTHCARE_FACILITY_TYPE_CODE, ORG_NAME, and CERT_* env vars."""
+    # Set professionOID
+    profession_oid = cert_data.read_profession_oid()
+    os.environ['OID_DIGA'] = profession_oid
+
+    # Map professionOID to healthcareFacilityTypeCode
+    facility_code = PROFESSION_OID_TO_FACILITY.get(profession_oid, 'PRA')
+    os.environ['HEALTHCARE_FACILITY_TYPE_CODE'] = facility_code
+    logger.info(f"SMC-B professionOID: {profession_oid} → mode: {'le' if is_le() else 'diga'}, facility: {facility_code}")
+
+    # LE-specific: extract org name and author fields from certificate
+    if is_le():
+        try:
+            if not os.getenv('ORG_NAME'):
+                os.environ['ORG_NAME'] = cert_data.read_organization_name()
+        except ValueError:
+            logger.warning("Could not read organization name from certificate.")
+        for field, env_key in [('read_surname', 'CERT_SURNAME'), ('read_given_name', 'CERT_GIVEN_NAME'), ('read_title', 'CERT_TITLE')]:
+            try:
+                value = getattr(cert_data, field)()
+                if value:
+                    os.environ[env_key] = value
+            except (AttributeError, ValueError):
+                pass
 
 def set_author():
     if 'TELEMATIK_ID' not in os.environ:
         raise ValueError("TELEMATIK_ID not set")
-    if 'DIGA_NAME' not in os.environ:
-        raise ValueError("DIGA_NAME not set")
-    os.environ['AUTHOR'] = generate_author()
+    if is_le():
+        os.environ['AUTHOR'] = generate_author_le()
+    else:
+        if 'DIGA_NAME' not in os.environ:
+            raise ValueError("DIGA_NAME not set")
+        os.environ['AUTHOR'] = generate_author()
 
 def set_institution():
     if 'TELEMATIK_ID' not in os.environ:
         raise ValueError("TELEMATIK_ID not set")
-    if 'DIGA_MANUFACTURER' not in os.environ:
-        raise ValueError("DIGA_MANUFACTURER not set")
-    os.environ['INSTITUTION'] = generate_institution()
+    if is_le():
+        os.environ['INSTITUTION'] = generate_institution_le()
+    else:
+        if 'DIGA_MANUFACTURER' not in os.environ:
+            raise ValueError("DIGA_MANUFACTURER not set")
+        os.environ['INSTITUTION'] = generate_institution()
 
 def get_telematik_id() -> str | None:
     if 'TELEMATIK_ID' not in os.environ:
@@ -74,6 +156,17 @@ def get_author() -> str | None:
 def get_institution() -> str | None:
     set_institution()
     return os.getenv('INSTITUTION')
+
+def get_author_role() -> str:
+    """Return the authorRole slot value based on SMC-B type.
+    DiGA: role 12 (dokumentierendes Gerät), LE: role 4 (Durchführender/performer).
+    Value set: 1.3.6.1.4.1.19376.3.276.1.5.13 (Prozessrollen für Autoren)
+    See: gemILF_PS_ePA §3.12.3 / Anhang B Tab.41
+    https://gemspec.gematik.de/docs/gemILF/gemILF_PS_ePA/latest/#A_15621-02
+    """
+    if is_le():
+        return "4^^^&1.3.6.1.4.1.19376.3.276.1.5.13&ISO"
+    return "12^^^&1.3.6.1.4.1.19376.3.276.1.5.13&ISO"
 
 EPA_ENVIRONMENT = os.getenv('EPA_ENVIRONMENT', 'RT').upper()
 if EPA_ENVIRONMENT not in EpaEnvs.available_envs():

@@ -6,6 +6,7 @@ from collections import OrderedDict, defaultdict
 from pyjson5 import load as json5_load
 import os
 import argparse
+from app.runtime_config.constants import DIGA_PROFESSION_OID
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config")
 
@@ -219,9 +220,28 @@ def load_fixed_configuration() -> OrderedDict:
     with open(os.path.join(CONFIG_PATH, "documentSetRequest_fixed_input.json"), "r", encoding="utf-8") as f:
         return json5_load(f, object_pairs_hook=OrderedDict)
 
-def load_ig_diga_configuration() -> OrderedDict:
-    with open(os.path.join(CONFIG_PATH, "documentSetRequest_ig-diga_V_1_1.json"), "r", encoding="utf-8") as f:
-        return convert_metadata_list_to_dict(json5_load(f, object_pairs_hook=OrderedDict)['elements'][0]['metadata'])
+def load_ig_configuration() -> OrderedDict:
+    """
+    Load the appropriate Implementation Guide configuration based on the professionOID in the SMC-B certificate.
+    Overrides practiceSettingCode and healthcareFacilityTypeCode from environment variables if set.
+    """
+    profession_oid = os.environ.get('OID_DIGA', DIGA_PROFESSION_OID)
+    is_diga = profession_oid == DIGA_PROFESSION_OID
+    config_file = 'documentSetRequest_ig-diga_V_1_1.json' if is_diga else 'documentSetRequest_ig-le_V_1_0.json'
+    with open(os.path.join(CONFIG_PATH, config_file), "r", encoding="utf-8") as f:
+        result = convert_metadata_list_to_dict(json5_load(f, object_pairs_hook=OrderedDict)['elements'][0]['metadata'])
+
+    # Override practiceSettingCode from env var (doctor's specialty can't be auto-detected)
+    practice_setting_override = os.environ.get('PRACTICE_SETTING_CODE')
+    if practice_setting_override and 'documentEntry' in result:
+        result['documentEntry']['practiceSettingCode']['code'] = practice_setting_override
+
+    # Override healthcareFacilityTypeCode from env var (auto-detected from professionOID)
+    healthcare_facility_override = os.environ.get('HEALTHCARE_FACILITY_TYPE_CODE')
+    if healthcare_facility_override and 'documentEntry' in result:
+        result['documentEntry']['healthcareFacilityTypeCode']['code'] = healthcare_facility_override
+
+    return result
 
 def load_document_set_request_schema(type: str) -> OrderedDict:
     if type == 'user':

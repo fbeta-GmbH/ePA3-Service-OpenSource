@@ -1,0 +1,76 @@
+{
+	"name": "Leistungserbringer",
+	"description": "Generic document upload configuration for Leistungserbringer (healthcare providers).",
+	"igVersion": "1.0.0",
+	"guidelineDefinition": {
+		"url": "https://gemspec.gematik.de/docs/gemSpec/gemSpec_DM_ePA/latest/",
+		"version": "1.0"
+	},
+	"folderCardinality": {
+		"min": "0",
+		"max": "n",
+		"unique": false
+	},
+	"validFromDate": "2025-01-01",
+	"type": "atomic",
+	"metadata": {},
+	"elements": [
+		{
+			"version": "1.0",
+			"name": "LE_Generic_Document",
+			"description": "Generic document uploaded by a Leistungserbringer (e.g. screening results, reports).",
+			"metadata": [
+				{
+					"name": "documentEntry.typeCode",
+					"value": {
+						"code": "BEFU",
+						"codeSystem": "1.3.6.1.4.1.19376.3.276.1.5.9",
+						"displayName": "Ergebnisse Diagnostik"
+					}
+				},
+				{
+					"name": "documentEntry.classCode",
+					"value": {
+						"code": "BEF",
+						"codeSystem": "1.3.6.1.4.1.19376.3.276.1.5.8",
+						"displayName": "Befundbericht"
+					}
+				},
+				{
+					"name": "documentEntry.formatCode",
+					"value": {
+						"code": "urn:ihe:iti:xds:2017:mimeTypeSufficient",
+						"codeSystem": "1.3.6.1.4.1.19376.1.2.3",
+						"displayName": "mimeTypeSufficient"
+					}
+				},
+				{
+					"name": "documentEntry.healthcareFacilityTypeCode",
+					"value": {
+						"code": "PRA",
+						"codeSystem": "1.3.6.1.4.1.19376.3.276.1.5.2",
+						"displayName": "Arztpraxis"
+					}
+				},
+				{
+					"name": "documentEntry.practiceSettingCode",
+					"value": {
+						"code": "INNE",
+						"codeSystem": "1.3.6.1.4.1.19376.3.276.1.5.4",
+						"displayName": "Innere Medizin"
+					}
+				},
+				{
+					"name": "documentEntry.mimeType",
+					"value": [
+						"application/fhir+xml",
+						"application/pdf"]
+				}
+			],
+			"documentCardinality": {
+				"min": "0",
+				"max": "n"
+			}
+		}
+	]
+}

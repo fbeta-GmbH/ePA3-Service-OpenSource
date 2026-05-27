@@ -14,13 +14,13 @@ class ReadCertData:
         try:
             # Base64-dekodieren und als DER-Zertifikat laden
             cert_bytes = base64.b64decode(cert_base64)
-            cert = x509.load_der_x509_certificate(cert_bytes, default_backend())
+            self.cert = x509.load_der_x509_certificate(cert_bytes, default_backend())
             # Definiere die OID für die Admission-Extension
             ADMISSION_IDENTIFIER_ID = "1.3.36.8.3.3"
             ADMISSION_OID = x509.ObjectIdentifier(ADMISSION_IDENTIFIER_ID)
 
             try:
-                admission_extension = cert.extensions.get_extension_for_oid(ADMISSION_OID)
+                admission_extension = self.cert.extensions.get_extension_for_oid(ADMISSION_OID)
                 admission_values = admission_extension.value
                 
                 if admission_values:
@@ -57,9 +57,41 @@ class ReadCertData:
                         return profession_oid.dotted_string
 
         except x509.ExtensionNotFound:
-                print("Admission Extension not found in certificate.")
+            logger.error("Admission Extension not found in certificate.")
 
         raise ValueError("Profession OIDs not found.")
 
+    def read_organization_name(self) -> str:
+        try:
+            org_names = self.cert.subject.get_attributes_for_oid(x509.oid.NameOID.ORGANIZATION_NAME)
+            if org_names:
+                logger.debug(f"Organization name found in certificate: {org_names[0].value}")
+                return str(org_names[0].value)
+        except Exception as e:
+            logger.error(f"Error reading organization name: {e}")
+        raise ValueError("Organization name not found in certificate.")
 
+    def read_common_name(self) -> str:
+        try:
+            common_name_attributes = self.cert.subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)
+            if common_name_attributes:
+                logger.debug(f"Common name found in certificate: {common_name_attributes[0].value}")
+                return str(common_name_attributes[0].value)
+        except Exception as e:
+            logger.error(f"Error reading common name: {e}")
+        raise ValueError("Common name not found in certificate.")
 
+    def read_surname(self) -> str | None:
+        """Read surName from cert Subject DN (optional, KBV-sector SMC-B only)."""
+        surname_attributes = self.cert.subject.get_attributes_for_oid(x509.oid.NameOID.SURNAME)
+        return str(surname_attributes[0].value) if surname_attributes else None
+
+    def read_given_name(self) -> str | None:
+        """Read givenName from cert Subject DN (optional, KBV-sector SMC-B only)."""
+        given_name_attributes = self.cert.subject.get_attributes_for_oid(x509.oid.NameOID.GIVEN_NAME)
+        return str(given_name_attributes[0].value) if given_name_attributes else None
+
+    def read_title(self) -> str | None:
+        """Read title from cert Subject DN (optional, KBV-sector SMC-B only)."""
+        title_attributes = self.cert.subject.get_attributes_for_oid(x509.oid.NameOID.TITLE)
+        return str(title_attributes[0].value) if title_attributes else None

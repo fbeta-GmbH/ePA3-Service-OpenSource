@@ -71,6 +71,22 @@
 					}
 				},
 				{
+					"name": "documentEntry.healthcareFacilityTypeCode",
+					"value": {
+						"code": "PAT",
+						"codeSystem": "1.3.6.1.4.1.19376.3.276.1.5.3",
+						"displayName": "Patient außerhalb der Betreuung"
+					}
+				},
+				{
+					"name": "documentEntry.practiceSettingCode",
+					"value": {
+						"code": "PAT",
+						"codeSystem": "1.3.6.1.4.1.19376.3.276.1.5.5",
+						"displayName": "Patient außerhalb der Betreuung"
+					}
+				},
+				{
 					"name": "documentEntry.mimeType",
 					"value": [
 						"application/fhir+xml",
