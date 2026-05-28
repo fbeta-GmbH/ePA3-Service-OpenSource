@@ -32,6 +32,12 @@ Um alle notwendigen Abhängigkeiten zu installieren, führen Sie das Skript `ins
 - `DEFAULT_EPA_PROVIDER_ID`: ID des ePA-Aktenkontoanbieters (z. B. `1` für IBM, `2` für Bitmarck Technik / RISE)
 - `USER_AGENT`: User Agent String für HTTP-Requests
 - `KONNEKTOR_URL`: URL des Konnektors
+- `KONNEKTOR_CERT_PW`: Passwort für das Konnektor `.p12`-Zertifikat
+- `KONNEKTOR_JWS_URL`: URL zu den vertrauenswürdigen Konnektor-Server-Zertifikaten (z. B. `https://client.rise-tiaas.de/update-tiaas-ru/trusted-server-certs-ru.jws` für RISE RU). Optional - wenn nicht gesetzt, wird die Konnektor-Identität nicht verifiziert (nicht empfohlen für Produktion)
+- `HTTPS_TIMEOUT`: Timeout für HTTPS-Anfragen in Sekunden (Standard: `30`)
+- `RECORD_PROVIDER_1`: Name des ersten ePA-Providers (z. B. `IBM`)
+- `RECORD_PROVIDER_2`: Name des zweiten ePA-Providers (z. B. `Bitmarck Technik`)
+
 
 ### DiGA-Identifikation
 Folgende Variablen werden zur Erstellung des Author-Strings verwendet:
@@ -48,9 +54,11 @@ Alternativ können Sie auch direkt den kompletten Author-String setzen:
 - `MANDANT_ID`: ID des eingerichteten Mandanten im Konnektor
 - `CLIENT_SYSTEM_ID`: ID des eingerichteten Client-Systems im Konnektor
 - `WORKPLACE_ID`: ID des eingerichteten Arbeitsplatzes im Konnektor
+- `USER_ID`: ID des Benutzers (optional)
 
 ### Logging
 - `LOG_LEVEL`: Logging-Level (INFO, DEBUG, ERROR, etc.)
+
 
 ## Konfiguration
 
