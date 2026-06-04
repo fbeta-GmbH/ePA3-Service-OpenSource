@@ -107,11 +107,14 @@ WORKPLACE_ID = os.getenv('WORKPLACE_ID')
 USER_ID = os.getenv('USER_ID')
 
 KONNEKTOR_CERT_PW = os.getenv('KONNEKTOR_CERT_PW')
+KONNEKTOR_JWS_URL = os.getenv("KONNEKTOR_JWS_URL", "")
 """
 URL to a JWS file published by the Konnektor provider, containing trusted server certificates, used to verify the identity of the Konnektor. 
-If empty, TLS server verification is disabled (verify=False) in all Konnektor requests.
+If empty, identity verification can only work with an already existing local bundle.
 """
-KONNEKTOR_JWS_URL = os.getenv("KONNEKTOR_JWS_URL", "")
+
+# Insecure override: only use insecure mode if no valid CA bundle is available.
+KONNEKTOR_ALLOW_INSECURE_TLS = os.getenv("KONNEKTOR_ALLOW_INSECURE_TLS", "false").lower() == "true"
 
 HTTPS_TIMEOUT = int(os.getenv('HTTPS_TIMEOUT', '30'))
 
@@ -122,7 +125,6 @@ if KONNEKTOR_CERT_PW is None:
     raise ValueError("KONNEKTOR_CERT_PW is not set. Please set it in your .env file.")
 if not KONNEKTOR_URL:
     raise ValueError("KONNEKTOR_URL is not set. Please set it in your .env file.")
-
 
 # === Loading CA-Bundles from truststores ===
 ti_ts = TI_Truststore(
@@ -146,19 +148,36 @@ kon_ts = Konnektor_Truststore(
 )
 KONNEKTOR_CA_BUNDLE = kon_ts.build_ca_bundle()
 
-if KONNEKTOR_CA_BUNDLE and KONNEKTOR_JWS_URL:
-    logger.info("Konnektor identity verification is ENABLED.")
-elif KONNEKTOR_CA_BUNDLE:
-    logger.warning(
-        f"Konnektor identity verification is ENABLED using existing certificate bundle at {KONNEKTOR_CA_BUNDLE}, but KONNEKTOR_JWS_URL is not set, so automatic refresh of the bundle is not available. \n"
-        "To enable automatic refresh, set KONNEKTOR_JWS_URL in your .env file (see .env.template for details)."
-    )
+if KONNEKTOR_CA_BUNDLE:
+    if KONNEKTOR_ALLOW_INSECURE_TLS:
+        raise ValueError(
+            "Insecure mode (KONNEKTOR_ALLOW_INSECURE_TLS=true) is enabled, but a valid Konnektor CA bundle was found. Remove KONNEKTOR_ALLOW_INSECURE_TLS from your .env file to run with secure certificate verification."
+        )
+
+    if KONNEKTOR_JWS_URL:
+        logger.info("Konnektor identity verification is ENABLED.")
+    else:
+        logger.warning(
+            f"Konnektor identity verification is ENABLED using existing certificate bundle at {KONNEKTOR_CA_BUNDLE}, but KONNEKTOR_JWS_URL is not set, so automatic refresh of the bundle is not available. \n"
+            "To enable automatic refresh, set KONNEKTOR_JWS_URL in your .env file (see .env.template for details)."
+        )
 else:
-    logger.error(
-        "Konnektor identity verification is DISABLED - the service cannot confirm it is talking to the real Konnektor. "
-        "This is NOT recommended for production use. \n"
-        "To enable it, set KONNEKTOR_JWS_URL in your .env file (see .env.template for details)."
-    )
+    if KONNEKTOR_JWS_URL:
+        raise ValueError(
+            "KONNEKTOR_JWS_URL is set, but no valid Konnektor CA bundle could be built or loaded. The service cannot confirm it is talking to the real Konnektor. "
+            "Please verify KONNEKTOR_JWS_URL and the certificates provided by your Konnektor provider."
+        )
+
+    if KONNEKTOR_ALLOW_INSECURE_TLS:
+        logger.error(
+            "Konnektor identity verification is EXPLICITLY DISABLED via KONNEKTOR_ALLOW_INSECURE_TLS=true. The service cannot confirm it is talking to the real Konnektor. "
+            "This is insecure and NOT recommended for production use."
+        )
+    else:
+        raise ValueError(
+            "Konnektor identity verification could not be initialized (no valid CA bundle available). The service cannot confirm it is talking to the real Konnektor. "
+            "Set KONNEKTOR_JWS_URL so the bundle can be built/refreshed, or set KONNEKTOR_ALLOW_INSECURE_TLS=true to explicitly allow insecure mode (not recommended)."
+        )
 
 TI_PKI_ROOTS_DIR = ti_ts.get_root_ca_path()
 
