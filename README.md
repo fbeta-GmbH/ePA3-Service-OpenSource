@@ -34,7 +34,7 @@ Um alle notwendigen Abhängigkeiten zu installieren, führen Sie das Skript `ins
 - `KONNEKTOR_URL`: URL des Konnektors
 - `KONNEKTOR_CERT_PW`: Passwort für das Konnektor `.p12`-Zertifikat
 - `KONNEKTOR_JWS_URL`: URL zu den vertrauenswürdigen Konnektor-Server-Zertifikaten (z. B. `https://client.rise-tiaas.de/update-tiaas-ru/trusted-server-certs-ru.jws` für RISE RU). 
-- `KONNEKTOR_ALLOW_INSECURE_TLS`: `true/false` (Standard: `false`). Wenn `true`, wird die TLS-Zertifikatsprüfung für den Konnektor deaktiviert. Dies sollte nur vorübergehend verwendet werden, wenn kein gültiges Konnektor-CA-Bundle verfügbar ist, da ansonsten die Identität des Konnektors nicht verifiziert werden kann (unsicher, NICHT für Produktion geeignet).
+- `KONNEKTOR_ALLOW_INSECURE_TLS`: `true/false` (Standard: `false`). Wenn `true`, wird die TLS-Zertifikatsprüfung für den Konnektor deaktiviert. Dies sollte nur vorübergehend verwendet werden, wenn kein gültiges Konnektor-CA-Bundle verfügbar ist, da ansonsten die Identität des Konnektors nicht verifiziert werden kann (unsicher, NICHT für Produktion geeignet). Kann nicht auf `true` gesetzt werden, wenn gleichzeitig eine `KONNEKTOR_JWS_URL` gesetzt ist.
 - `HTTPS_TIMEOUT`: Timeout für HTTPS-Anfragen in Sekunden (Standard: `30`)
 - `RECORD_PROVIDER_1`: Name des ersten ePA-Providers (z. B. `IBM`)
 - `RECORD_PROVIDER_2`: Name des zweiten ePA-Providers (z. B. `Bitmarck Technik`)

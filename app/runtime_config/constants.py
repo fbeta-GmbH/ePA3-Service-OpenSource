@@ -155,7 +155,7 @@ if KONNEKTOR_CA_BUNDLE:
         )
 
     if KONNEKTOR_JWS_URL:
-        logger.debug("Konnektor identity verification is ENABLED.")
+        logger.info("Konnektor identity verification is ENABLED.")
     else:
         logger.warning(
             f"Konnektor identity verification is ENABLED using existing certificate bundle at {KONNEKTOR_CA_BUNDLE}, but KONNEKTOR_JWS_URL is not set, so automatic refresh of the bundle is not available. \n"
