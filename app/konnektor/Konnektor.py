@@ -15,7 +15,7 @@ from requests.adapters import HTTPAdapter
 from app.logging_config import logger
 
 from app.utils.utils import convert_der_ecdsa_to_concated_x962
-from app.runtime_config.constants import MANDANT_ID, CLIENT_SYSTEM_ID, USER_AGENT, WORKPLACE_ID, HTTPS_TIMEOUT, USER_ID, DIGA_NAME, DIGA_MANUFACTURER, KONNEKTOR_URL, KONNEKTOR_CERT_PW, KONNEKTOR_CA_BUNDLE
+from app.runtime_config.constants import MANDANT_ID, CLIENT_SYSTEM_ID, USER_AGENT, WORKPLACE_ID, HTTPS_TIMEOUT, USER_ID, DIGA_NAME, DIGA_MANUFACTURER, KONNEKTOR_URL, KONNEKTOR_CERT_PW, KONNEKTOR_CA_BUNDLE, KONNEKTOR_ALLOW_INSECURE_TLS
 
 from app.exceptions import KonnektorException, CardException, ErrorCodes
 from app.xml_service.soap_client import SoapClient
@@ -50,7 +50,15 @@ class Konnektor:
         self.session.headers.update({
             'Content-Type': 'application/xml',
         })
-        self.session.verify = KONNEKTOR_CA_BUNDLE if KONNEKTOR_CA_BUNDLE else False
+        if KONNEKTOR_CA_BUNDLE:
+            self.session.verify = KONNEKTOR_CA_BUNDLE
+        elif KONNEKTOR_ALLOW_INSECURE_TLS:
+            self.session.verify = False
+        else:
+            raise KonnektorException(
+                message="Konnektor identity verification is required, but no CA bundle is available.",
+                error_code=ErrorCodes.KONNEKTOR_INIT_FAILED,
+            )
 
         self.db = self.init_db()
         
