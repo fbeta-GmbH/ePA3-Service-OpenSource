@@ -107,11 +107,11 @@ WORKPLACE_ID = os.getenv('WORKPLACE_ID')
 USER_ID = os.getenv('USER_ID')
 
 KONNEKTOR_CERT_PW = os.getenv('KONNEKTOR_CERT_PW')
+KONNEKTOR_JWS_URL = os.getenv("KONNEKTOR_JWS_URL", "")
 """
 URL to a JWS file published by the Konnektor provider, containing trusted server certificates, used to verify the identity of the Konnektor. 
 If empty, identity verification can only work with an already existing local bundle.
 """
-KONNEKTOR_JWS_URL = os.getenv("KONNEKTOR_JWS_URL", "")
 
 # Insecure override: only use insecure mode if no valid CA bundle is available.
 KONNEKTOR_ALLOW_INSECURE_TLS = os.getenv("KONNEKTOR_ALLOW_INSECURE_TLS", "false").lower() == "true"
