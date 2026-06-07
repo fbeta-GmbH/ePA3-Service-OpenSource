@@ -1152,27 +1152,25 @@ windows-terminal = ["colorama (>=0.4.6)"]
 
 [[package]]
 name = "pyhanko-certvalidator"
-version = "0.26.3"
+version = "0.31.1"
 description = "Validates X.509 certificates and paths; forked from wbond/certvalidator"
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.10"
 groups = ["default"]
 files = [
-    {file = "pyhanko-certvalidator-0.26.3.tar.gz", hash = "sha256:47fba8e9dbf846d766f2e0a453572dd4b25b2f1397847a31fe892c8eb00391f5"},
-    {file = "pyhanko_certvalidator-0.26.3-py3-none-any.whl", hash = "sha256:e386c87e202ff1caacf5fd941da6c3509e79db54dbd7b43c6550ceebe5e67077"},
+    {file = "pyhanko_certvalidator-0.31.1-py3-none-any.whl", hash = "sha256:0aabe25b536ed555f3b18e5eb2c62ff46adeff9d15e27f0c9d5d81952d956f45"},
+    {file = "pyhanko_certvalidator-0.31.1.tar.gz", hash = "sha256:b7abc5672878994a050cf70a19b8247891aa30c9e6507eea77a6b10c7dbc1e50"},
 ]
 
 [package.dependencies]
 asn1crypto = ">=1.5.1"
-cryptography = ">=41.0.5"
+cryptography = ">=48.0.0"
 oscrypto = ">=1.1.0"
 requests = ">=2.31.0"
 uritools = ">=3.0.1"
 
 [package.extras]
-async-http = ["aiohttp (>=3.8,<3.10)"]
-mypy = ["pyhanko-certvalidator[testing]", "types-requests"]
-testing = ["aiohttp (>=3.8,<3.10)", "freezegun (>=1.1.0)", "pyhanko-certvalidator[async-http]", "pytest (>=6.1.1)", "pytest-aiohttp (>=1.0.4,<1.1.0)", "pytest-cov (>=4.0,<4.2)"]
+async-http = ["aiohttp (>=3.9,<3.14)"]
 
 [[package]]
 name = "pyjson5"
@@ -1749,4 +1747,4 @@ xmlsec = ["xmlsec (>=0.6.1)"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<4.0"
-content-hash = "4cc212ccc6ec5f0906244d31ee6e0ba780363828629221148eb45a9cdd0f68fa"
+content-hash = "17ffa1568cb9cf1776f1a6861d910663f5e182822db576303eae8ad8e7a34815"
