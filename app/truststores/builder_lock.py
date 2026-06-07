@@ -2,7 +2,7 @@ import os
 import time
 import tempfile
 
-from app.logging_config import logger
+from app.runtime_config.logging import logger
 
 class Builder_Locker():
     """

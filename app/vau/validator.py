@@ -40,7 +40,7 @@ from pyhanko_certvalidator.policy_decl import (
 # from app.constants import HTTPS_TIMEOUT, TI_PKI_ROOTS_DIR, USER_AGENT
 from app.runtime_config.constants import HTTPS_TIMEOUT, TI_PKI_ROOTS_DIR, USER_AGENT
 from app.exceptions import ErrorCodes, VAUException
-from app.logging_config import logger
+from app.runtime_config.logging import logger
 from app.vau.vau_models import (
     AUT_VAU_CertData,
     ECDHPublicKey,

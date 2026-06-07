@@ -28,7 +28,7 @@ from pymtom_xop.soap_envelope import SoapEnvelope
 from pymtom_xop.xop_package import XopPackage
 
 
-from app.logging_config import logger
+from app.runtime_config.logging import logger
 
 import app.utils.utils as utils
 from app.xml_service.documentSetRequest_model import (

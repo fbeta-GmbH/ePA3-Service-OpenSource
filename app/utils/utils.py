@@ -4,7 +4,7 @@ import base64
 import time
 import requests
 
-from app.logging_config import logger
+from app.runtime_config.logging import logger
 from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
 
 import json

@@ -21,7 +21,7 @@ from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
 from base64 import b64encode
 from fastapi import status
 
-from app.logging_config import logger
+from app.runtime_config.logging import logger
 
 from app.vau import kemvau, utils, validator
 from app.runtime_config.constants import USER_AGENT, EPA_ENVIRONMENT, HTTPS_TIMEOUT, TI_CA_BUNDLE, EpaEnvs

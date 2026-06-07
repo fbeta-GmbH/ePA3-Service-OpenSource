@@ -1,16 +1,11 @@
 import os
 
-from app.runtime_config.bootstrap import _APP_ROOT, USER_CONFIG_DIR, load_env
-from app.logging_config import logger
+from app import USER_CONFIG_DIR, TEMP_DIR
+from app.runtime_config.logging import logger, LOG_LEVEL
 from app.runtime_config.epa_env import EpaEnvs
 from app.truststores.ti.ti_truststore import TI_Truststore
 from app.truststores.konnektor.konnektor_truststore import Konnektor_Truststore
 from app.konnektor.pkcs12adapter import find_p12
-
-load_env()
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
-
-logger.info(f"Loading constants using config from /{os.path.relpath(USER_CONFIG_DIR, _APP_ROOT)}")
 
 # Dynamically load RECORD_PROVIDER_X variables from the environment
 RECORD_PROVIDER_MAPPING: dict[str, int] = {}
@@ -128,7 +123,7 @@ if not KONNEKTOR_URL:
 
 # === Loading CA-Bundles from truststores ===
 ti_ts = TI_Truststore(
-    ca_path=os.getenv('TI_CA_BUNDLE_PATH', os.path.join(_APP_ROOT, 'app', 'tmp', 'ti-ca')),
+    ca_path=os.getenv('TI_CA_BUNDLE_PATH', str(TEMP_DIR / 'ti-ca')),
     epa_envs=epa_envs,
     provider_mapping=RECORD_PROVIDER_MAPPING,
     https_timeout=HTTPS_TIMEOUT,
@@ -138,22 +133,20 @@ TI_CA_BUNDLE = ti_ts.build_ca_bundle()
 
 # Build the Konnektor CA bundle from the JWS-provided server certificates.
 kon_ts = Konnektor_Truststore(
-    ca_bundle_path=os.getenv('KONNEKTOR_CA_BUNDLE', os.path.join(_APP_ROOT, 'app', 'tmp', 'konnektor-ca')),
+    ca_bundle_path=os.getenv('KONNEKTOR_CA_BUNDLE', str(TEMP_DIR / 'konnektor-ca')),
     epa_envs=epa_envs,
     konnektor_url=KONNEKTOR_URL,
     konnektor_jws_url=KONNEKTOR_JWS_URL,
-    p12_path=find_p12(USER_CONFIG_DIR),
+    p12_path=find_p12(str(USER_CONFIG_DIR)),
     p12_password=KONNEKTOR_CERT_PW,
     https_timeout=HTTPS_TIMEOUT,
 )
-KONNEKTOR_CA_BUNDLE = kon_ts.build_ca_bundle()
+if not KONNEKTOR_ALLOW_INSECURE_TLS:
+    KONNEKTOR_CA_BUNDLE = kon_ts.build_ca_bundle()
+else:
+    KONNEKTOR_CA_BUNDLE = None
 
 if KONNEKTOR_CA_BUNDLE:
-    if KONNEKTOR_ALLOW_INSECURE_TLS:
-        raise ValueError(
-            "Insecure mode (KONNEKTOR_ALLOW_INSECURE_TLS=true) is enabled, but a valid Konnektor CA bundle was found. Remove KONNEKTOR_ALLOW_INSECURE_TLS from your .env file to run with secure certificate verification."
-        )
-
     if KONNEKTOR_JWS_URL:
         logger.info("Konnektor identity verification is ENABLED.")
     else:
