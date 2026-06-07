@@ -13,7 +13,7 @@ from cryptography.hazmat.primitives import serialization
 from requests import Session
 from requests.adapters import HTTPAdapter
 
-from app.logging_config import logger
+from app.runtime_config.logging import logger
 
 import ssl
 

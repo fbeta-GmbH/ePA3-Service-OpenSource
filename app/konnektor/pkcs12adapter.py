@@ -6,7 +6,7 @@ import ssl
 from http import HTTPStatus as status
 
 from app.exceptions import ErrorCodes, KonnektorException
-from app.logging_config import logger
+from app.runtime_config.logging import logger
 
 
 class PinnedPkcs12Adapter(requests_pkcs12.Pkcs12Adapter):

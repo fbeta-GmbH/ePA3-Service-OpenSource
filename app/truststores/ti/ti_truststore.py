@@ -16,7 +16,7 @@ import hashlib
 from app.truststores.ti.utils import ROOT_FILE_RE, SUB_FILE_RE
 
 from app.runtime_config.epa_env import EpaEnvConfig
-from app.logging_config import logger
+from app.runtime_config.logging import logger
 from app.truststores.builder_lock import Builder_Locker
 
 from cryptography import x509

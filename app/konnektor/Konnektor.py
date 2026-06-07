@@ -1,6 +1,5 @@
-from typing import Optional, Tuple
+from typing import Optional
 import requests
-import requests_pkcs12
 import base64
 import hashlib
 import datetime
@@ -11,11 +10,12 @@ import os
 from fastapi import status
 from requests import Session
 from requests.adapters import HTTPAdapter
+import warnings
 
-from app.logging_config import logger
+from app.runtime_config.logging import logger
 
 from app.utils.utils import convert_der_ecdsa_to_concated_x962
-from app.runtime_config.constants import MANDANT_ID, CLIENT_SYSTEM_ID, USER_AGENT, WORKPLACE_ID, HTTPS_TIMEOUT, USER_ID, DIGA_NAME, DIGA_MANUFACTURER, KONNEKTOR_URL, KONNEKTOR_CERT_PW, KONNEKTOR_CA_BUNDLE, KONNEKTOR_ALLOW_INSECURE_TLS
+from app.runtime_config.constants import MANDANT_ID, CLIENT_SYSTEM_ID, USER_AGENT, WORKPLACE_ID, HTTPS_TIMEOUT, KONNEKTOR_URL, KONNEKTOR_CERT_PW, KONNEKTOR_CA_BUNDLE, KONNEKTOR_ALLOW_INSECURE_TLS
 
 from app.exceptions import KonnektorException, CardException, ErrorCodes
 from app.xml_service.soap_client import SoapClient
@@ -23,6 +23,7 @@ from app.xml_service.soap_client import SoapClient
 from app.konnektor.pkcs12adapter import PinnedPkcs12Adapter
 
 
+warnings.filterwarnings("ignore", category=UserWarning, module="requests_pkcs12")
 
 class Konnektor:
     def __init__(self, path_to_p12:str, test_conn: bool = True)->None:

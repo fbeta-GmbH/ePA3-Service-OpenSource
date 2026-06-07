@@ -1,0 +1,75 @@
+# openssl-konnektor.cnf
+#
+# Source:
+#   https://gemspec.gematik.de/docs/gemSpec/gemSpec_Krypt/gemSpec_Krypt_V2.49.0/
+
+openssl_conf = openssl_init
+
+[openssl_init]
+ssl_conf = ssl_section
+
+[ssl_section]
+system_default = tls_defaults
+
+[tls_defaults]
+
+# GS-A_4385:
+#   TLS 1.2 MUST be supported.
+#
+# A_18467:
+#   TLS 1.3 MAY be supported, but is optional.
+#
+# A_18464, GS-A_4387, GS-A_5035:
+#   TLS 1.1, TLS 1.0, and SSL MUST NOT be supported.
+MinProtocol = TLSv1.2
+MaxProtocol = TLSv1.2
+
+# GS-A_4384-03:
+#   For ECDHE, P-256 and P-384 MUST be supported.
+#   brainpoolP256r1 and brainpoolP384r1 SHOULD be supported.
+#   No other curves than those listed in GS-A_4384-* may be used.
+#
+# GS-A_5345-04:
+#   For Konnektor TLS, P-256, P-384, brainpoolP256r1, and brainpoolP384r1
+#   MUST be supported when the listed ECDHE suites are supported.
+#   Other curves SHOULD NOT be used.
+#
+# A_17094-02:
+#   Konnektor ECC migration requires P-256, P-384,
+#   brainpoolP256r1, and brainpoolP384r1 for ECDHE.
+#   Other curves SHOULD NOT be used.
+#
+# OpenSSL names:
+#   P-256 = prime256v1 / secp256r1
+#   P-384 = secp384r1
+Groups = secp384r1:prime256v1:brainpoolP384r1:brainpoolP256r1
+
+# A_17124-03 / A_17094-02:
+#   ECC migration cipher suites:
+#     TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+#     TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+#
+# A_17124-03:
+#   A TLS client MUST prefer the ECDSA suites over RSA-based suites
+#   by putting them first in ClientHello.cipher_suites.
+#
+# GS-A_4384-03:
+#   General mandatory RSA cipher suites:
+#     TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+#     TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+#
+# GS-A_5345-04:
+#   Konnektor additional RSA cipher suites:
+#     TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256
+#     TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384
+#     TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+#     TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+#
+# OpenSSL names:
+#   TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384 = ECDHE-ECDSA-AES256-GCM-SHA384
+#   TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 = ECDHE-ECDSA-AES128-GCM-SHA256
+#   TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384   = ECDHE-RSA-AES256-GCM-SHA384
+#   TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256   = ECDHE-RSA-AES128-GCM-SHA256
+#   TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384   = ECDHE-RSA-AES256-SHA384
+#   TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256   = ECDHE-RSA-AES128-SHA256
+CipherString = ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES128-SHA256

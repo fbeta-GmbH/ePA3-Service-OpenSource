@@ -9,7 +9,7 @@ from fastapi import status
 from jwcrypto import common, jwe, jwk, jws
 from typing import Any
 
-from app.logging_config import logger
+from app.runtime_config.logging import logger
 
 from app.runtime_config.constants import IDP_URL, USER_AGENT, IDP_AUTH_PATH, HTTPS_TIMEOUT
 

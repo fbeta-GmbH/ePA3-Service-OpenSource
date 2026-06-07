@@ -1,9 +1,10 @@
-
 import os
 
 import json
 
-from app.logging_config import logger
+from app import DATA_DIR, USER_CONFIG_DIR
+from app.konnektor.pkcs12adapter import find_p12
+from app.runtime_config.logging import logger
 
 from app.vau import VAUProtokoll
 from app.konnektor import Konnektor
@@ -18,9 +19,7 @@ from app.runtime_config.constants import DEFAULT_AS_URL, set_telematik_id, set_o
 
 
 def send_document_to_epa(metadata: dict, document_file_name: str):
-        document_file_location = os.path.join(
-            os.path.dirname(__file__), '..', 'data', 'examples', 'documents', document_file_name
-        )
+        document_file_location = str(DATA_DIR / 'examples' / 'documents' / document_file_name)
 
         logger.info("Starting ePA-Client")
 
@@ -30,7 +29,7 @@ def send_document_to_epa(metadata: dict, document_file_name: str):
         vau_con = VAUProtokoll.VAUKanal(AS_URL)
 
         logger.info("Initializing Konnektor")
-        p12_path = os.path.join(os.path.dirname(__file__),'..', '..', 'config', 'cert.p12')
+        p12_path = find_p12(str(USER_CONFIG_DIR))
         auth = Konnektor.Konnektor(p12_path)
 
         logger.info("Initializing IdentityProvider")

@@ -29,7 +29,7 @@ default = [
     "jwcrypto==1.5.7",
     "lxml==6.1.0",
     "oqs==0.10.2",
-    "pyhanko_certvalidator==0.26.3",
+    "pyhanko-certvalidator==0.31.1",
     "pyjson5==2.0.0",
     "pymtom_xop==0.0.2",
     "python-dotenv==1.2.2",

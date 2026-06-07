@@ -7,7 +7,7 @@ import base64
 
 
 
-from app.logging_config import logger
+from app.runtime_config.logging import logger
 
 class ReadCertData:
     def __init__(self, cert_base64: str):

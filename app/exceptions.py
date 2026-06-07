@@ -1,6 +1,6 @@
 from http import HTTPStatus
 
-from app.logging_config import logger
+from app.runtime_config.logging import logger
 
 class ErrorCodes:
     """Centralized error codes for better consistency and documentation"""
@@ -17,7 +17,7 @@ class ErrorCodes:
     EPA_SEND_ERROR = "EPA_SEND_ERROR"
     
     # Konnektor errors
-    KONNEKTOR_INIT_FAILED = "KONNETKTOR_INIT_FAILED"
+    KONNEKTOR_INIT_FAILED = "KONNEKTOR_INIT_FAILED"
     KONNEKTOR_REQUEST_FAILED = "KONNEKTOR_REQUEST_FAILED"
     KONNEKTOR_ENDPOINT_NOTREACHABLE= "KONNEKTOR_ENDPOINT_NOTREACHABLE"
     KONNEKTOR_MALFORMED_REQUEST = "KONNEKTOR_MALFORMED_REQUEST"
