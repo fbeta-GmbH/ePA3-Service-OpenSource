@@ -41,16 +41,10 @@
 			"classificationScheme": "urn:uuid:f0306f51-975f-434e-a61c-c59651d33983"
 		},
 		"healthcareFacilityTypeCode": {
-			"classificationScheme": "urn:uuid:f33fb8ac-18af-42cc-ae0e-ed0b0bdb91e1",
-			"code": "PAT",
-			"codeSystem": "1.3.6.1.4.1.19376.3.276.1.5.3",
-			"displayName": "Patient außerhalb der Betreuung"
+			"classificationScheme": "urn:uuid:f33fb8ac-18af-42cc-ae0e-ed0b0bdb91e1"
 		},
 		"practiceSettingCode": {
-			"classificationScheme": "urn:uuid:cccf5598-8b07-4b77-a05e-ae952c785ead",
-			"code": "PAT",
-			"codeSystem": "1.3.6.1.4.1.19376.3.276.1.5.5",
-			"displayName": "Patient außerhalb der Betreuung"
+			"classificationScheme": "urn:uuid:cccf5598-8b07-4b77-a05e-ae952c785ead"
 		}
 	}
 }

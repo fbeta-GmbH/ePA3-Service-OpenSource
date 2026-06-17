@@ -253,11 +253,11 @@ class VAUKanal:
                 Returns:
                         dict: A dictionary containing 'http_status', 'headers', and 'body'.
                 """
-        # 1. Bytes zu String dekodieren
-        decoded_response = response.decode("utf-8")
+        # 1. Header und Body trennen
+        header_bytes, body_bytes = response.split(b"\r\n\r\n", 1)
 
-        # 2. Header und Body trennen
-        header_part, body_part = decoded_response.split("\r\n\r\n", 1)
+        # 2. Header dekodieren
+        header_part = header_bytes.decode("utf-8")
 
         # 3. Header aufschlüsseln
         headers = header_part.split("\r\n")
@@ -268,11 +268,14 @@ class VAUKanal:
             key, value = header.split(": ", 1)
             header_dict[key] = value
 
-        # 4. JSON-Body parsen
+        # 4. Body parsen (JSON oder String oder Bytes-Fallback)
         try:
-            body_json = json.loads(body_part)
-        except json.JSONDecodeError:
-            body_json = body_part  # Fallback: Raw body, falls kein JSON vorliegt
+            body_json = json.loads(body_bytes)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            try:
+                body_json = body_bytes.decode("utf-8")
+            except UnicodeDecodeError:
+                body_json = body_bytes  # Fallback: Raw bytes für binary MTOM-Responses
         except Exception as e:
             raise VAUException(
                 message=f"Error parsing HTTP response body: {str(e)}",
@@ -281,7 +284,7 @@ class VAUKanal:
             )
 
         result = {"http_status": http_status, "headers": header_dict, "body": body_json}
-        logger.debug("Parsed response: %s", json.dumps(result, indent=4))
+        logger.debug("Parsed response: %s", json.dumps(result, indent=4, default=str))
         return result
 
     def send_vau_message(self, inner_request: bytes, vau_np=None) -> bytes:
@@ -563,7 +566,7 @@ class VAUKanal:
                 new_uri,
                 headers={
                     "Content-Type": "application/octet-stream",
-                    "x-useragent": utils.sanitize_header_value(USER_AGENT),
+                    "x-useragent": self.sanitized_user_agent,
                 },
                 timeout=HTTPS_TIMEOUT,
                 verify=TI_CA_BUNDLE,
@@ -701,7 +704,13 @@ class VAUKanal:
 
             # Parse the decrypted response with zeep
             response_obj = requests.Response()
-            response_obj._content = parsed_decrypted_resp["body"].encode("utf-8")
+            body = parsed_decrypted_resp["body"]
+            if isinstance(body, bytes):
+                response_obj._content = body
+            elif isinstance(body, str):
+                response_obj._content = body.encode("utf-8")
+            else:
+                response_obj._content = json.dumps(body).encode("utf-8")
             response_obj.status_code = int(
                 parsed_decrypted_resp["http_status"].split(" ")[1]
             )
@@ -725,4 +734,164 @@ class VAUKanal:
                 message=f"Error when sending a document to the ePA: {str(e)}",
                 error_code=ErrorCodes.EPA_SEND_ERROR,
                 status_code=status.HTTP_502_BAD_GATEWAY
+            )
+
+    def retrieve_document(
+        self, vau_np: str, document_unique_id: str, insurant_id: str, repository_unique_id: str = ""
+    ) -> dict:
+        """
+        Retrieves a document from the ePA using RetrieveDocumentSet [ITI-43].
+
+        Args:
+            vau_np (str): The VAU-NP Token.
+            document_unique_id (str): The unique ID of the document to retrieve.
+            insurant_id (str): The KVNR of the insurant.
+            repository_unique_id (str): The unique ID of the repository.
+
+        Returns:
+            dict: The parsed response containing the document.
+        """
+        try:
+            logger.info("Retrieving document: %s", document_unique_id)
+
+            soap_xml = SoapClient.build_epa_retrieve_request_message(
+                document_unique_id=document_unique_id,
+                repository_unique_id=repository_unique_id,
+            )
+            body = soap_xml.encode("utf-8")
+
+            inner_request = self.build_inner_header(
+                "POST /epa/xds-document/api/I_Document_Management",
+                insurant_id=insurant_id,
+                accept_type=None,
+                content_type='application/soap+xml; charset=utf-8',
+                content_length=len(body),
+            )
+            inner_request = inner_request.encode("utf-8") + body
+
+            decrypted_resp = self.send_vau_message(inner_request, vau_np=vau_np)
+            parsed_decrypted_resp = self.parse_inner_http_response(decrypted_resp)
+
+            logger.debug("Retrieve document response: %s", json.dumps(parsed_decrypted_resp, indent=4, default=str))
+
+            response_obj = requests.Response()
+            body = parsed_decrypted_resp["body"]
+            if isinstance(body, bytes):
+                response_obj._content = body
+            elif isinstance(body, str):
+                response_obj._content = body.encode("utf-8")
+            else:
+                response_obj._content = json.dumps(body).encode("utf-8")
+            response_obj.status_code = int(parsed_decrypted_resp["http_status"].split(" ")[1])
+            response_obj.encoding = "utf-8"
+            response_obj.headers = parsed_decrypted_resp["headers"]
+
+            parsed_decrypted_resp["body"] = SoapClient.parse_xml_response(
+                response_obj,
+                SoapClient.Services.DocumentService.I_Document_Management.DocumentRepository_RetrieveDocumentSet,
+            )
+
+            # TODO: utils.check_retrieve_response_for_errors(parsed_decrypted_resp["body"])
+            return parsed_decrypted_resp
+
+        except (DocumentException, AuthorizationException):
+            raise
+        except Exception as e:
+            raise DocumentException(
+                message=f"Error retrieving document from ePA: {str(e)}",
+                error_code=ErrorCodes.DOC_RETRIEVE_ERROR,
+                status_code=status.HTTP_502_BAD_GATEWAY,
+            )
+
+    def search_documents(
+        self, vau_np: str, insurant_id: str,
+        status_values: list[str] | None = None,
+        creation_time_from: str | None = None,
+        creation_time_to: str | None = None,
+        class_codes: list[str] | None = None,
+        type_codes: list[str] | None = None,
+        format_codes: list[str] | None = None,
+        title: str | None = None,
+        comments: str | None = None,
+        return_type: str = "LeafClass",
+    ) -> dict:
+        """
+        Searches for documents in the ePA using RegistryStoredQuery / FindDocuments [ITI-18].
+
+        Args:
+            vau_np (str): The VAU-NP Token.
+            insurant_id (str): The KVNR of the insurant.
+            status_values (list[str]): Document status filter values.
+            creation_time_from (str): Creation time lower bound.
+            creation_time_to (str): Creation time upper bound.
+            class_codes (list[str]): Class code filter values.
+            type_codes (list[str]): Type code filter values.
+            format_codes (list[str]): Format code filter values.
+            return_type (str): "LeafClass" or "ObjectRef".
+
+        Returns:
+            dict: The parsed response containing document metadata.
+        """
+        try:
+            logger.info("Searching documents for insurant: %s", insurant_id)
+
+            patient_id = f"{insurant_id}^^^&1.2.276.0.76.4.8&ISO"
+            soap_xml = SoapClient.build_epa_search_request_message(
+                patient_id=patient_id,
+                status_values=status_values,
+                creation_time_from=creation_time_from,
+                creation_time_to=creation_time_to,
+                class_codes=class_codes,
+                type_codes=type_codes,
+                format_codes=format_codes,
+                title=title,
+                comments=comments,
+                return_type=return_type,
+            )
+            body = soap_xml.encode("utf-8")
+
+            content_type = 'application/soap+xml;action="urn:ihe:iti:2007:RegistryStoredQuery"'
+
+            inner_request = self.build_inner_header(
+                "POST /epa/xds-document/api/I_Document_Management",
+                insurant_id,
+                accept_type=None,
+                content_type=content_type,
+                content_length=len(body),
+            )
+            inner_request = inner_request.encode("utf-8") + body
+
+            decrypted_resp = self.send_vau_message(inner_request, vau_np=vau_np)
+            parsed_decrypted_resp = self.parse_inner_http_response(decrypted_resp)
+
+            logger.debug("Search documents response: %s", json.dumps(parsed_decrypted_resp, indent=4, default=str))
+
+            response_obj = requests.Response()
+            body = parsed_decrypted_resp["body"]
+            if isinstance(body, bytes):
+                response_obj._content = body
+            elif isinstance(body, str):
+                response_obj._content = body.encode("utf-8")
+            else:
+                response_obj._content = json.dumps(body).encode("utf-8")
+            response_obj.status_code = int(parsed_decrypted_resp["http_status"].split(" ")[1])
+            response_obj.encoding = "utf-8"
+            response_obj.headers = parsed_decrypted_resp["headers"]
+
+            parsed_decrypted_resp["body"] = SoapClient.parse_xml_response(
+                response_obj,
+                SoapClient.Services.DocumentService.I_Document_Management.DocumentRegistry_RegistryStoredQuery,
+            )
+
+            # TODO: utils.check_search_response_for_errors(parsed_decrypted_resp["body"])
+
+            return parsed_decrypted_resp
+
+        except (DocumentException, AuthorizationException):
+            raise
+        except Exception as e:
+            raise DocumentException(
+                message=f"Error searching documents in ePA: {str(e)}",
+                error_code=ErrorCodes.DOC_SEARCH_ERROR,
+                status_code=status.HTTP_502_BAD_GATEWAY,
             )

@@ -15,12 +15,10 @@ from app.xml_service.soap_client import SoapClient
 
 
 from app.utils.cert_data_util import ReadCertData
-from app.runtime_config.constants import DEFAULT_AS_URL, set_telematik_id, set_oid_diga
+from app.runtime_config.constants import DEFAULT_AS_URL, set_telematik_id, set_cert_author_fields
 
-
-def send_document_to_epa(metadata: dict, document_file_name: str):
-        document_file_location = str(DATA_DIR / 'examples' / 'documents' / document_file_name)
-
+def _init_and_authenticate(insurant_id: str):
+        """Initialize Konnektor, IDP and VAU session, authenticate and return (vau_con, vau_np)."""
         logger.info("Starting ePA-Client")
 
         AS_URL = DEFAULT_AS_URL
@@ -37,7 +35,7 @@ def send_document_to_epa(metadata: dict, document_file_name: str):
 
 
         # Get nonce from VAUProtokoll
-        nonce = vau_con.get_nonce(insurant_id=metadata['insurantId'])
+        nonce = vau_con.get_nonce(insurant_id=insurant_id)
 
         #Get card handle and certificate
         card, card_certificate = auth.get_card_data()
@@ -51,15 +49,16 @@ def send_document_to_epa(metadata: dict, document_file_name: str):
         auth.store_card_data(card=card, card_certificate=card_certificate)
         logger.info("Stored card data")
 
-        set_telematik_id(ReadCertData(cert_base64=card_certificate).read_telematik_id())
-        set_oid_diga(ReadCertData(cert_base64=card_certificate).read_profession_oid())
+        cert_data = ReadCertData(cert_base64=card_certificate)
+        set_telematik_id(cert_data.read_telematik_id())
+        set_cert_author_fields(cert_data)
 
 
         # Create signed attest JWT
         attest_jwt = auth.create_signed_attest_jwt(nonce=nonce, card_handle=card, card_certificate=card_certificate)
 
         # Create challenge token
-        challenge_token, user_consent = vau_con.send_authorization_request_sc(insurant_id=metadata['insurantId'])
+        challenge_token, user_consent = vau_con.send_authorization_request_sc(insurant_id=insurant_id)
 
         header_payload_challenge_string = idp.auth_build_inner_header_payload(challenge_token=challenge_token, card_cert=card_certificate)
 
@@ -79,13 +78,21 @@ def send_document_to_epa(metadata: dict, document_file_name: str):
             logger.info("Challenge JWT received: %s", challenge_jwt)
 
             # send auth code
-            vau_np = vau_con.send_authcode_sc(authcode=challenge_jwt, client_attest_jwt=attest_jwt, insurant_id=metadata['insurantId'])
+            vau_np = vau_con.send_authcode_sc(authcode=challenge_jwt, client_attest_jwt=attest_jwt, insurant_id=insurant_id)
             logger.info("Vau NP: %s", vau_np)
             
         else:
             raise ValueError("Challenge token signature verification failed")
 
         logger.info("--------------AUTH ABGESCHLOSSEN------------------")
+        return vau_con, vau_np, AS_URL
+
+
+def send_document_to_epa(metadata: dict, document_file_name: str):
+        document_file_location = str(DATA_DIR / 'examples' / 'documents' / document_file_name)
+
+        vau_con, vau_np, AS_URL = _init_and_authenticate(metadata['insurantId'])
+
         logger.info("--------------SEND DATA START------------------")
         if vau_np:            
             # Construct the SOAP message
@@ -111,12 +118,15 @@ def send_document_to_epa(metadata: dict, document_file_name: str):
 if __name__ == "__main__":
     logger.info("Starting ePA client")
 
+    INSURANT_ID = "X99999999"
+    DOCUMENT_TITLE = "Testdokument"
+
     sample_metadata = {
-        "insurantId": "X99999999",
+        "insurantId": INSURANT_ID,
         "documentEntry": {
-            "creationTime": "20230609115053",
-            "title": "Testdokument",
-            "URI": "Testdokument.xml",
+            "creationTime": "20260616115053",
+            "title": DOCUMENT_TITLE,
+            "URI": f"{DOCUMENT_TITLE}.xml",
             "entryUUID": "urn:uuid:8b7a4223-ce93-49fa-9a9b-3ba2e55279ca"
             # OPTIONAL - If you want to replace a document
             # "oldEntryUUID": "DocumentEntry_old.entryUUID",

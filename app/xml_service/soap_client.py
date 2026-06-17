@@ -37,11 +37,11 @@ from app.xml_service.documentSetRequest_model import (
     ProvideAndRegisterDocumentSetRequest, RegistryObjectList, RegistryPackage,
     Slot, SubmitObjectsRequest, ValueList,
     dict_to_defaultdict, load_document_set_request_schema,
-    load_fixed_configuration, load_ig_diga_configuration, object_to_dict)
+    load_fixed_configuration, load_ig_configuration, object_to_dict)
 from app.xml_service.generated_wsdl_classes import (
     CONN_AUTHSIGNATURESERVICE_V7_4_1, CONN_CERTIFICATESERVICE_V6_0_1, CONN_CARDSERVICE,
     CONN_EVENTSERVICE, XDSDOCUMENTSERVICE, WsdlOperation, WsdlService)
-from app.runtime_config.constants import DEFAULT_AS_URL, get_author, get_institution
+from app.runtime_config.constants import DEFAULT_AS_URL, get_author, get_institution, get_author_role
 
 
 class SoapClient:
@@ -82,7 +82,7 @@ class SoapClient:
             strict=True,  
             xml_huge_tree=True, 
             raw_response=True, 
-            xsd_ignore_sequence_order=False, 
+            xsd_ignore_sequence_order=True, 
             forbid_external=False, 
             forbid_entities=False
         )
@@ -344,11 +344,14 @@ class SoapClient:
         Returns:
             Dict[str, Any]: Dictionary representation of the ProvideAndRegisterDocumentSetRequest object.
         """
-        ig_diga_data = load_ig_diga_configuration()
+        ig_diga_data = load_ig_configuration()
         ig_diga_data = dict(dict_to_defaultdict(ig_diga_data))
 
         fixed_data = load_fixed_configuration()
         fixed_data = dict(dict_to_defaultdict(fixed_data))
+
+        # Override author role based on actor type (DiGA vs Leistungserbringer)
+        fixed_data["submissionSet"]["author"]["role"] = get_author_role()
 
         # Validate user input using the 'user' schema
         user_input_schema = load_document_set_request_schema('user')
@@ -475,8 +478,7 @@ class SoapClient:
                     [(key, {key: x})
                         for key in ["confidentialityCode", "eventCodeList"] if key in input_data["documentEntry"] 
                         for x in input_data["documentEntry"][key]]
-                    + [(x, ig_diga_data["documentEntry"]) for x in  ["classCode", "formatCode", "typeCode"]]
-                    + [(x, fixed_data["documentEntry"]) for x in    ["healthcareFacilityTypeCode", "practiceSettingCode"]]
+                    + [(x, ig_diga_data["documentEntry"]) for x in  ["classCode", "formatCode", "typeCode", "healthcareFacilityTypeCode", "practiceSettingCode"]]
                 ) if name in item],
                 ClassificationItem(
                     id="documentEntry.author",
@@ -597,6 +599,108 @@ class SoapClient:
         logger.debug(f"Headers: {mtom_attachment_info['headers']}")
         logger.debug(f"Boundary: {mtom_attachment_info['boundary']}")
         return mtom_attachment_info
+
+    @staticmethod
+    def build_epa_retrieve_request_message(document_unique_id: str, repository_unique_id: str) -> str:
+        """
+        Build a SOAP XML message for RetrieveDocumentSet (ITI-43).
+
+        Args:
+            document_unique_id (str): The unique ID of the document to retrieve.
+            repository_unique_id (str): The unique ID of the repository.
+
+        Returns:
+            str: The generated SOAP XML as a string.
+        """
+        params = {
+            "DocumentRequest": {
+                "DocumentUniqueId": document_unique_id,
+                "RepositoryUniqueId": repository_unique_id,
+            }
+        }
+        return SoapClient.generate_xml(
+            SoapClient.Services.DocumentService.I_Document_Management.DocumentRepository_RetrieveDocumentSet,
+            params
+        )
+
+    @staticmethod
+    def build_epa_search_request_message(
+        patient_id: str,
+        status_values: list[str] | None = None,
+        creation_time_from: str | None = None,
+        creation_time_to: str | None = None,
+        class_codes: list[str] | None = None,
+        type_codes: list[str] | None = None,
+        format_codes: list[str] | None = None,
+        title: str | None = None,
+        comments: str | None = None,
+        return_type: str = "LeafClass",
+    ) -> str:
+        """
+        Build a SOAP XML message for RegistryStoredQuery / FindDocuments (ITI-18).
+
+        Uses the appropriate gematik query variant:
+        - FindDocumentsByTitle (A_17198-02) when title is provided
+        - FindDocumentsByComment (A_25187-01) when comments is provided
+        - Standard FindDocuments otherwise
+
+        Args:
+            patient_id (str): The patient ID in format "KVNR^^^&1.2.276.0.76.4.8&ISO".
+            status_values (list[str]): Document status filter values.
+            creation_time_from (str): Creation time lower bound (YYYYMMDDHHmmss).
+            creation_time_to (str): Creation time upper bound (YYYYMMDDHHmmss).
+            class_codes (list[str]): Class code filter values.
+            type_codes (list[str]): Type code filter values.
+            format_codes (list[str]): Format code filter values.
+            title (str): Document title filter (uses FindDocumentsByTitle query, supports SQL LIKE patterns).
+            comments (str): Document comments filter (uses FindDocumentsByComment query, supports SQL LIKE patterns).
+            return_type (str): "LeafClass" for full metadata or "ObjectRef" for IDs only.
+
+        Returns:
+            str: The generated SOAP XML as a string.
+        """
+        if status_values is None:
+            status_values = ["urn:oasis:names:tc:ebxml-regrep:StatusType:Approved"]
+
+        slots = [
+            Slot(name="$XDSDocumentEntryPatientId", ValueList=ValueList(Value=[f"('{patient_id}')"])),
+            Slot(name="$XDSDocumentEntryStatus", ValueList=ValueList(Value=[f"('{s}')" for s in status_values])),
+        ]
+
+        if creation_time_from:
+            slots.append(Slot(name="$XDSDocumentEntryCreationTimeFrom", ValueList=ValueList(Value=creation_time_from)))
+        if creation_time_to:
+            slots.append(Slot(name="$XDSDocumentEntryCreationTimeTo", ValueList=ValueList(Value=creation_time_to)))
+        if class_codes:
+            slots.append(Slot(name="$XDSDocumentEntryClassCode", ValueList=ValueList(Value=[f"('{c}')" for c in class_codes])))
+        if type_codes:
+            slots.append(Slot(name="$XDSDocumentEntryTypeCode", ValueList=ValueList(Value=[f"('{t}')" for t in type_codes])))
+        if format_codes:
+            slots.append(Slot(name="$XDSDocumentEntryFormatCode", ValueList=ValueList(Value=[f"('{f}')" for f in format_codes])))
+
+        # Determine query ID based on search type (gematik-specific extensions)
+        if comments:
+            query_id = "urn:uuid:2609dda5-2b97-44d5-a795-3e999c24ca99"  # FindDocumentsByComment (A_25187-01)
+            slots.append(Slot(name="$XDSDocumentEntryComments", ValueList=ValueList(Value=f"('{comments}')")))
+        elif title:
+            query_id = "urn:uuid:ab474085-82b5-402d-8115-3f37cb1e2405"  # FindDocumentsByTitle (A_17198-02)
+            slots.append(Slot(name="$XDSDocumentEntryTitle", ValueList=ValueList(Value=f"('{title}')")))
+        else:
+            query_id = "urn:uuid:14d4debf-8f97-4251-9a74-a90016b0af0d"  # FindDocuments
+
+        params = {
+            "AdhocQuery": {
+                "id": query_id,
+                "Slot": object_to_dict(slots),
+            },
+            "ResponseOption": {
+                "returnType": return_type,
+            },
+        }
+        return SoapClient.generate_xml(
+            SoapClient.Services.DocumentService.I_Document_Management.DocumentRegistry_RegistryStoredQuery,
+            params
+        )
 
 
 
