@@ -2,13 +2,13 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from app.runtime_config.logging import logger
 
 import secrets
 
 import oqs
 import oqs.rand as oqsrand
 
-from icecream import ic
 from binascii import hexlify
 # nur fürs pretty-Printing das json-modul
 import json
@@ -117,11 +117,11 @@ def encapsulation(pk_keys: dict) -> dict:
     ecdh_ct = encode_ecc_pub_key(tmp_private_key.public_key())
     ecdh_shared_secret = tmp_private_key.exchange(ec.ECDH(), remote_ecc_public_key)
 
-    ic(ecdh_shared_secret)
+    logger.debug("ecdh_shared_secret: %s", ecdh_shared_secret)
 
     with oqs.KeyEncapsulation("Kyber768") as server:
         kyber768_ct, kyber768_shared_secret = server.encap_secret(pk_keys["Kyber768_PK"])
-        ic(kyber768_shared_secret)
+        logger.debug("kyber768_shared_secret: %s", kyber768_shared_secret)
 
     return {
         "ECDH_ct": ecdh_ct,
@@ -287,12 +287,11 @@ def decapsulation(ciphertexts: dict, priv_keys: dict) -> dict:
     ecc_public_key_sender = decode_ecc_pub_key(ciphertexts["ECDH_ct"])
     ecdh_shared_secret = priv_keys["ECDH"]["priv_key"].exchange(ec.ECDH(), ecc_public_key_sender)
 
-    ic(ecdh_shared_secret)
+    logger.debug("ecdh_shared_secret: %s", ecdh_shared_secret)
 
-    #ic(priv_keys["Kyber768"]["priv_key"])
     with oqs.KeyEncapsulation("Kyber768", priv_keys["Kyber768"]["priv_key"]) as client:
         shared_secret_client = client.decap_secret(ciphertexts["Kyber768_ct"])
-        ic(shared_secret_client)
+        logger.debug("shared_secret_client: %s", shared_secret_client)
 
     return {"ECDH_ss" : ecdh_shared_secret,
             "Kyber768_ss" : shared_secret_client}

@@ -14,7 +14,6 @@ import requests
 import secrets
 import json
 from urllib import parse
-from icecream import ic
 from jwcrypto import jwe
 from cryptography import x509
 from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
@@ -144,7 +143,7 @@ class VAUKanal:
                         Diese wird zum Server zurückgeschickt."""
 
             client_kem_result_1 = kemvau.decapsulation(nachricht_2, client_schluessel_1)
-            ic("Schlüsselableitung für die K1-Schlüssel")
+            logger.debug("Schlüsselableitung für die K1-Schlüssel")
             (c_k1_c2s, c_k1_s2c) = kemvau.kem_kdf(client_kem_result_1)
             transfered_signed_vau_server_pub_keys = kemvau.aead_dec(
                 c_k1_s2c, nachricht_2["AEAD_ct"]
@@ -170,7 +169,7 @@ class VAUKanal:
             aead_ciphertext_msg_3 = kemvau.aead_enc(c_k1_c2s, nachricht_3_inner_layer_encoded)
             transscript_client_to_send = transscript_client + aead_ciphertext_msg_3
 
-            ic("Schlüsselableitung für die K2-Schlüssel")
+            logger.debug("Schlüsselableitung für die K2-Schlüssel")
             (
                 c_k2_c2s_key_confirmation,
                 self.c_k2_c2s_app_data,
@@ -223,8 +222,8 @@ class VAUKanal:
                         Den eigenen Hash verschlüsselt er mit dem KdfKey2 (=Ciphertext-KeyConfirmation). 
                         Diese wird in VauMessage 4 gespeichert und zurück zum Client geschickt.
                         """
-            ic(http_response.status_code)
-            # ic(http_response.content)
+            logger.debug("HTTP response status code: %s", http_response.status_code)
+            # logger.debug("HTTP response content: %s", http_response.content)
             logger.info("Status code: %s", http_response.status_code)
             assert http_response.status_code == requests.codes.ok
             assert http_response.headers["Content-Type"] == "application/cbor"

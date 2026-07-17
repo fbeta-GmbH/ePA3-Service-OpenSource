@@ -13,6 +13,7 @@ from urllib.parse import urljoin
 import requests
 import hashlib
 
+# from app.truststores.ti.utils import ROOT_FILE_RE
 from app.truststores.ti.utils import ROOT_FILE_RE, SUB_FILE_RE
 
 from app.runtime_config.epa_env import EpaEnvConfig
@@ -22,7 +23,7 @@ from app.truststores.builder_lock import Builder_Locker
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 import certifi
-from lxml import etree 
+from lxml import etree # pyright: ignore[reportAttributeAccessIssue]
 import ssl
 
 class TI_Truststore:
