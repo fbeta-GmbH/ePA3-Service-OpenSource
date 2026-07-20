@@ -5,28 +5,21 @@ Parameters:
 AS_URL (str): The URL of the authentication server, must start with 'http://' or 'https://' and end with '/'.
 """
 
-import os
-import traceback
-from typing import Optional
-import cbor2
 import hashlib
-import requests
-import secrets
 import json
-from urllib import parse
-from jwcrypto import jwe
-from cryptography import x509
-from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
+import secrets
 from base64 import b64encode
+from typing import Optional
+from urllib import parse
+
+import cbor2
+import requests
 from fastapi import status
 
+from app.exceptions import AuthenticationException, AuthorizationException, DocumentException, ErrorCodes, VAUException
 from app.runtime_config.logging import logger
-
+from app.runtime_config.constants import EPA_ENVIRONMENT, HTTPS_TIMEOUT, TI_CA_BUNDLE, USER_AGENT, EpaEnvs
 from app.vau import kemvau, utils, validator
-from app.runtime_config.constants import USER_AGENT, EPA_ENVIRONMENT, HTTPS_TIMEOUT, TI_CA_BUNDLE, EpaEnvs
-
-from app.exceptions import DocumentException, VAUException, AuthorizationException, AuthenticationException, ErrorCodes
-
 from app.xml_service.soap_client import SoapClient
 
 
@@ -70,7 +63,7 @@ class VAUKanal:
             self.sanitized_user_agent = utils.sanitize_header_value(USER_AGENT)
 
             self.https_session = requests.Session()
-            
+            self.https_session.verify = TI_CA_BUNDLE
             self.vau_cert_validator = validator.VAUCertificateValidator(AS_URL=self.AS_URL, https_session=self.https_session)
 
             # VauMessage 1:
@@ -95,8 +88,6 @@ class VAUKanal:
                     },
                     data=nachricht_1_encoded,
                     timeout=HTTPS_TIMEOUT*2,
-                    # Um ein VAU-Kanal zu https://epa-as-2.dev.epa4all.de/ aufzubauen muss verify auf False gesetzt werden, da es sich um ein self-signed Zertifikat handelt
-                    verify=TI_CA_BUNDLE,
                 )
             except Exception as e:
                 raise VAUException(
@@ -151,8 +142,9 @@ class VAUKanal:
             # Im Produktivcode try-Umgebung, weil daten noch nicht authentisiert
             signed_vau_server_pub_keys = cbor2.loads(transfered_signed_vau_server_pub_keys)
 
-            logger.info(signed_vau_server_pub_keys)
+            logger.debug(signed_vau_server_pub_keys)
 
+            # Enforce A_24624-01 certificate validation here; violations raise VAUException directly.
             self.vau_cert_validator.validate(signed_vau_server_pub_keys)
 
             pub_keys = cbor2.loads(signed_vau_server_pub_keys["signed_pub_keys"])
@@ -200,8 +192,6 @@ class VAUKanal:
                     },
                     data=nachricht_3_encoded,
                     timeout=HTTPS_TIMEOUT,
-                    # Um ein VAU-Kanal zu https://epa-as-2.dev.epa4all.de/ aufzubauen muss verify auf False gesetzt werden, da es sich um ein self-signed Zertifikat handelt
-                    verify=TI_CA_BUNDLE,
                 )
             except Exception as e:
                 raise VAUException(
@@ -232,7 +222,7 @@ class VAUKanal:
 
             logger.info("----------------------VAU-KANAL ERFOLGREICH AUFGEBAUT----------------------")
         except VAUException:
-            raise    
+            raise
         except Exception as e:
             logger.error("Unexpected error during building of VAU-Kanal: %s", str(e))
             raise VAUException(
@@ -305,6 +295,7 @@ class VAUKanal:
         try:
             self.encryption_counter += 1
             self.request_counter += 1
+
             random_4_bytes = secrets.token_bytes(4)
             iv = random_4_bytes + self.encryption_counter.to_bytes(8, "big")
 
@@ -347,7 +338,6 @@ class VAUKanal:
                 headers=headers,
                 data=message,
                 timeout=HTTPS_TIMEOUT,
-                verify=TI_CA_BUNDLE,
             )
 
             # Get response data
@@ -568,7 +558,6 @@ class VAUKanal:
                     "x-useragent": self.sanitized_user_agent,
                 },
                 timeout=HTTPS_TIMEOUT,
-                verify=TI_CA_BUNDLE,
             )
 
             logger.debug("HTTP Content: %s", http_response.content)
@@ -791,6 +780,7 @@ class VAUKanal:
             )
 
             # TODO: utils.check_retrieve_response_for_errors(parsed_decrypted_resp["body"])
+
             return parsed_decrypted_resp
 
         except (DocumentException, AuthorizationException):

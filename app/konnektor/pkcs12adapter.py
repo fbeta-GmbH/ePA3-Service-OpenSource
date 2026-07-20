@@ -107,9 +107,5 @@ def find_p12(user_config_dir: str) -> str:
         raise KonnektorException(
             message="Certificate file not found",
             error_code=ErrorCodes.KONNEKTOR_INIT_FAILED,
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={
-                "path": user_config_dir,
-                "resolution": "Please ensure the certificate exists in the config directory and is named with a .p12 extension.",
-            },
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
