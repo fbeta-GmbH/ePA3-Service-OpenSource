@@ -38,7 +38,7 @@ from pyhanko_certvalidator.policy_decl import (
 )
 
 # from app.constants import HTTPS_TIMEOUT, TI_PKI_ROOTS_DIR, USER_AGENT
-from app.runtime_config.constants import HTTPS_TIMEOUT, TI_PKI_ROOTS_DIR, USER_AGENT
+from app.runtime_config.constants import HTTPS_TIMEOUT, TI_PKI_ROOTS_DIR, USER_AGENT, TI_CA_BUNDLE
 from app.exceptions import ErrorCodes, VAUException
 from app.runtime_config.logging import logger
 from app.vau.vau_models import (
@@ -181,10 +181,9 @@ class VAUCertificateValidator:
         cert_endpoint = urljoin(self.AS_URL, f"/CertData.{cert_hash_hex}-{cdv}")
 
         # Request CertData
-        # TODO: Remove `verify=False`
         cert_data_response = self.https_session.get(
             cert_endpoint,
-            verify=False,
+            verify=TI_CA_BUNDLE,
             headers={"x-useragent": USER_AGENT},
             timeout=HTTPS_TIMEOUT
         )

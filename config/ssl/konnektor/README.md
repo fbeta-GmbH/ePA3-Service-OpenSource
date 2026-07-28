@@ -1,0 +1,1 @@
+Place the Konnektor CA certificate here as `cert.pem` when using `KONNEKTOR_TLS_MODE="alternative"`.

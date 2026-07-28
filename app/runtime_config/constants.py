@@ -4,8 +4,8 @@ from app import USER_CONFIG_DIR, TEMP_DIR
 from app.runtime_config.logging import logger, LOG_LEVEL
 from app.runtime_config.epa_env import EpaEnvs
 from app.truststores.ti.ti_truststore import TI_Truststore
-from app.truststores.konnektor.konnektor_truststore import Konnektor_Truststore
 from app.konnektor.pkcs12adapter import find_p12
+from app.runtime_config.data.konnektor_tls_mode import KonnektorTlsMode
 
 # Dynamically load RECORD_PROVIDER_X variables from the environment
 RECORD_PROVIDER_MAPPING: dict[str, int] = {}
@@ -195,14 +195,11 @@ WORKPLACE_ID = os.getenv('WORKPLACE_ID')
 USER_ID = os.getenv('USER_ID')
 
 KONNEKTOR_CERT_PW = os.getenv('KONNEKTOR_CERT_PW')
-KONNEKTOR_JWS_URL = os.getenv("KONNEKTOR_JWS_URL", "")
-"""
-URL to a JWS file published by the Konnektor provider, containing trusted server certificates, used to verify the identity of the Konnektor. 
-If empty, identity verification can only work with an already existing local bundle.
-"""
 
 # Insecure override: only use insecure mode if no valid CA bundle is available.
-KONNEKTOR_ALLOW_INSECURE_TLS = os.getenv("KONNEKTOR_ALLOW_INSECURE_TLS", "false").lower() == "true"
+ENABLE_SMC_K_TLS_VERIFICATION = os.getenv("ENABLE_SMC_K_TLS_VERIFICATION", "false").lower() == "true"
+
+KONNEKTOR_TLS_MODE = os.getenv("KONNEKTOR_TLS_MODE", KonnektorTlsMode.SMC_K.value).lower()
 
 HTTPS_TIMEOUT = int(os.getenv('HTTPS_TIMEOUT', '30'))
 
@@ -224,49 +221,42 @@ ti_ts = TI_Truststore(
 
 TI_CA_BUNDLE = ti_ts.build_ca_bundle()
 
-# Build the Konnektor CA bundle from the JWS-provided server certificates.
-kon_ts = Konnektor_Truststore(
-    ca_bundle_path=os.getenv('KONNEKTOR_CA_BUNDLE', str(TEMP_DIR / 'konnektor-ca')),
-    epa_envs=epa_envs,
-    konnektor_url=KONNEKTOR_URL,
-    konnektor_jws_url=KONNEKTOR_JWS_URL,
-    p12_path=find_p12(str(USER_CONFIG_DIR)),
-    p12_password=KONNEKTOR_CERT_PW,
-    https_timeout=HTTPS_TIMEOUT,
-)
-if not KONNEKTOR_ALLOW_INSECURE_TLS:
-    KONNEKTOR_CA_BUNDLE = kon_ts.build_ca_bundle()
-else:
-    KONNEKTOR_CA_BUNDLE = None
+KONNEKTOR_TLS_MODE = os.getenv("KONNEKTOR_TLS_MODE", "alternative").lower()
+if KONNEKTOR_TLS_MODE not in [mode.value for mode in KonnektorTlsMode]:
+    raise ValueError(f"Invalid KONNEKTOR_TLS_MODE: {KONNEKTOR_TLS_MODE}. Must be one of {[mode.value for mode in KonnektorTlsMode]}.")
 
-if KONNEKTOR_CA_BUNDLE:
-    if KONNEKTOR_JWS_URL:
-        logger.info("Konnektor identity verification is ENABLED.")
-    else:
+
+KONNEKTOR_URL = os.getenv('KONNEKTOR_URL', '')
+KONNEKTOR_IP = KONNEKTOR_URL.split("//")[-1].split("/")[0].split(":")[0]  # Extract hostname or IP from URL
+KONNEKTOR_TLS_HOSTNAME = None  # Default: use IP for both connection and TLS verification
+
+match KONNEKTOR_TLS_MODE:
+    case KonnektorTlsMode.ALTERNATIVE.value:
+        KONNEKTOR_CA_BUNDLE = os.path.join(USER_CONFIG_DIR, "ssl", "konnektor", "cert.pem")
+        if not os.path.isfile(KONNEKTOR_CA_BUNDLE):
+            logger.error(f"KONNEKTOR_TLS_MODE=alternative is set, but the alternative certificate bundle does not exist at {KONNEKTOR_CA_BUNDLE}.")
+            raise FileNotFoundError(f"Alternative certificate bundle not found at {KONNEKTOR_CA_BUNDLE}.")
         logger.warning(
-            f"Konnektor identity verification is ENABLED using existing certificate bundle at {KONNEKTOR_CA_BUNDLE}, but KONNEKTOR_JWS_URL is not set, so automatic refresh of the bundle is not available. \n"
-            "To enable automatic refresh, set KONNEKTOR_JWS_URL in your .env file (see .env.template for details)."
+            f"Konnektor identity verification is ENABLED using existing certificate bundle at {KONNEKTOR_CA_BUNDLE}\n"
+            "To enable automatic refresh via ti-tls, set KONNEKTOR_TLS_MODE to \"smc_k\".\n" 
+            "For that: Be sure to set \"Zertifikat für die Authentisierung\" to \"gSMC-K Zertifikat (ECC)\"."
         )
-else:
-    if KONNEKTOR_JWS_URL:
-        raise ValueError(
-            "KONNEKTOR_JWS_URL is set, but no valid Konnektor CA bundle could be built or loaded. The service cannot confirm it is talking to the real Konnektor. "
-            "Please verify KONNEKTOR_JWS_URL and the certificates provided by your Konnektor provider."
+    case KonnektorTlsMode.SMC_K.value:
+        KONNEKTOR_CA_BUNDLE = TI_CA_BUNDLE
+        KONNEKTOR_TLS_HOSTNAME = "konnektor.konlan"
+        KONNEKTOR_URL = f"https://{KONNEKTOR_TLS_HOSTNAME}"
+        logger.info(
+            "Konnektor identity verification is ENABLED using SMC-K certificate bundle."
         )
-
-    if KONNEKTOR_ALLOW_INSECURE_TLS:
+    case KonnektorTlsMode.INSECURE.value:
+        KONNEKTOR_CA_BUNDLE = None
         logger.error(
-            "Konnektor identity verification is EXPLICITLY DISABLED via KONNEKTOR_ALLOW_INSECURE_TLS=true. The service cannot confirm it is talking to the real Konnektor. "
+            "Konnektor identity verification is EXPLICITLY DISABLED via KONNEKTOR_TLS_MODE=insecure. The service cannot confirm it is talking to the real Konnektor. "
             "This is insecure and NOT recommended for production use."
         )
-    else:
-        raise ValueError(
-            "Konnektor identity verification could not be initialized (no valid CA bundle available). The service cannot confirm it is talking to the real Konnektor. "
-            "Set KONNEKTOR_JWS_URL so the bundle can be built/refreshed, or set KONNEKTOR_ALLOW_INSECURE_TLS=true to explicitly allow insecure mode (not recommended)."
-        )
+
 
 TI_PKI_ROOTS_DIR = ti_ts.get_root_ca_path()
-
 
 logger.info(f"""
 Constants loaded:

@@ -10,12 +10,18 @@ import os
 from fastapi import status
 from requests import Session
 from requests.adapters import HTTPAdapter
+from ssl import SSLCertVerificationError
 import warnings
 
 from app.runtime_config.logging import logger
 
 from app.utils.utils import convert_der_ecdsa_to_concated_x962
-from app.runtime_config.constants import MANDANT_ID, CLIENT_SYSTEM_ID, USER_AGENT, WORKPLACE_ID, HTTPS_TIMEOUT, KONNEKTOR_URL, KONNEKTOR_CERT_PW, KONNEKTOR_CA_BUNDLE, KONNEKTOR_ALLOW_INSECURE_TLS
+from app.runtime_config.constants import (
+    MANDANT_ID, CLIENT_SYSTEM_ID, WORKPLACE_ID, HTTPS_TIMEOUT, 
+    KONNEKTOR_URL, KONNEKTOR_CERT_PW,
+    KONNEKTOR_CA_BUNDLE,
+    KONNEKTOR_IP, KONNEKTOR_TLS_HOSTNAME
+)
 
 from app.exceptions import KonnektorException, CardException, ErrorCodes
 from app.xml_service.soap_client import SoapClient
@@ -40,10 +46,13 @@ class Konnektor:
         self.session = Session()
 
         ca_bundle = KONNEKTOR_CA_BUNDLE if isinstance(KONNEKTOR_CA_BUNDLE, str) else None
+                
         pkcs12_adapter = PinnedPkcs12Adapter(
             pkcs12_filename=self.path_to_p12,
             pkcs12_password=self.cert_password,
             ca_bundle=ca_bundle,
+            tls_hostname=KONNEKTOR_TLS_HOSTNAME,
+            target_ip=KONNEKTOR_IP,
         )
 
         self.session.mount("https://", pkcs12_adapter)
@@ -53,12 +62,11 @@ class Konnektor:
         })
         if KONNEKTOR_CA_BUNDLE:
             self.session.verify = KONNEKTOR_CA_BUNDLE
-        elif KONNEKTOR_ALLOW_INSECURE_TLS:
-            self.session.verify = False
         else:
-            raise KonnektorException(
-                message="Konnektor identity verification is required, but no CA bundle is available.",
-                error_code=ErrorCodes.KONNEKTOR_INIT_FAILED,
+            self.session.verify = False  # Disable certificate verification if no CA bundle is provided
+            logger.error(
+                "Konnektor identity verification is EXPLICITLY DISABLED via KONNEKTOR_TLS_MODE=insecure. The service cannot confirm it is talking to the real Konnektor. "
+                "This is insecure and NOT recommended for production use."
             )
 
         self.db = self.init_db()
@@ -92,13 +100,18 @@ class Konnektor:
             bool: True if the connection is successful, False otherwise.
         """
         try:
-            response = self.session.get(f'{KONNEKTOR_URL}/connector.sds', timeout=HTTPS_TIMEOUT)
+            response = self.session.get(
+                f'{KONNEKTOR_URL}/connector.sds',
+                timeout=HTTPS_TIMEOUT
+            )
             if response.status_code == status.HTTP_200_OK:
                 logger.info("Konnektor connection test successful")
                 return True
             else:
                 logger.error("Konnektor connection test failed with status code: %d", response.status_code)
                 return False     
+        except (requests.exceptions.SSLError, SSLCertVerificationError):
+            raise
         except requests.exceptions.RequestException as e:
 
             raise KonnektorException(
@@ -194,7 +207,7 @@ class Konnektor:
             response = self.session.post(
                 f'{KONNEKTOR_URL}/webservices/eventservice',
                 data=soap_request,
-                timeout=HTTPS_TIMEOUT,
+                timeout=HTTPS_TIMEOUT
             )
 
             # Evaluate the response using zeep
@@ -220,6 +233,8 @@ class Konnektor:
                 error_code=ErrorCodes.CARD_NOT_FOUND,
             )
         
+        except (requests.exceptions.SSLError, SSLCertVerificationError):
+            raise
         except requests.exceptions.RequestException as e:
             raise KonnektorException(
                 message=f"Failed to communicate with Konnektor: {e}",
@@ -286,6 +301,8 @@ class Konnektor:
             certificate_base64 = base64.b64encode(certificate_bytes).decode('utf-8')
             return certificate_base64
         
+        except (requests.exceptions.SSLError, SSLCertVerificationError):
+            raise
         except requests.exceptions.RequestException as e:
             raise KonnektorException(
                 message=f"Failed to read card certificate: {str(e)}",
@@ -359,6 +376,8 @@ class Konnektor:
                     message=f"Unexpected PIN status '{pin_status}'",
                     error_code=ErrorCodes.UNEXPECTED_ERROR
                     )
+        except (requests.exceptions.SSLError, SSLCertVerificationError):
+            raise
         except requests.exceptions.RequestException as e:
             raise CardException(
                 message=f"Failed to call GetPinStatus: {str(e)}", 
@@ -551,6 +570,8 @@ class Konnektor:
             logger.debug("Base64Signature: %s", base64_signature)
             return base64_signature
         
+        except (requests.exceptions.SSLError, SSLCertVerificationError):
+            raise
         except requests.exceptions.RequestException as e:
             raise KonnektorException(
                 message=f"Failed to authenticate with Konnektor: {str(e)}",

@@ -2,18 +2,26 @@ import requests_pkcs12
 import os
 import glob
 import ssl
+import urllib3.util.connection
 
-from http import HTTPStatus as status
+
+from fastapi import status
 
 from app.exceptions import ErrorCodes, KonnektorException
 from app.runtime_config.logging import logger
 
 
 class PinnedPkcs12Adapter(requests_pkcs12.Pkcs12Adapter):
-    """Pkcs12Adapter mit PARTIAL_CHAIN-Flag für Leaf-Pinning."""
+    """Pkcs12Adapter mit PARTIAL_CHAIN-Flag für Leaf-Pinning und optionalem IP-Override."""
 
-    def __init__(self, *args, ca_bundle: str | None = None, **kwargs):
+    def __init__(self, *args, ca_bundle: str | None = None, target_ip: str | None = None, 
+                 tls_hostname: str | None = None, **kwargs):
+        
+        self.target_ip = target_ip
+        self.tls_hostname = tls_hostname
+        
         super().__init__(*args, **kwargs)
+        
         if ca_bundle:
             ctx = self.ssl_context
             ctx.load_verify_locations(cafile=ca_bundle)
@@ -21,7 +29,48 @@ class PinnedPkcs12Adapter(requests_pkcs12.Pkcs12Adapter):
             ctx.verify_flags |= ssl.VERIFY_X509_PARTIAL_CHAIN
             ctx.check_hostname = True
             ctx.verify_mode = ssl.CERT_REQUIRED
+
+    def init_poolmanager(self, *args, **kwargs):
+        """
+        init_poolmanager ist eine Funktion zum Initialisieren des PoolManagers für die Pkcs12Adapter-Klasse.
+        Diese wird bei der __init__-Methode des Pkcs12Adapters aufgerufen, um die Verbindungspools für HTTPS-Verbindungen zu initialisieren.
+        init_poolmanager erstellt einen PoolManager, welcher HTTPSConnectionsPools erstellt und verwaltet.
+        Im HTTPSConnectionPool können dann HTTPS-Verbindungen konfiguriert werden.
+        
+        In dieser überladenen Funktion wird diese eigenart genutzt um die Verbindung zu einem bestimmten Ziel-IP-Adresse umzuleiten, 
+        während der TLS-Handshake weiterhin den Hostnamen verwendet.
+        
+        Während des TLS-Handshakes wird der Hostname (tls_hostname) verwendet, um das Zertifikat zu validieren,
+        während die Verbindung tatsächlich zu einer angegebenen IP-Adresse (target_ip) hergestellt wird.
+        
+        Aus diesem Grund muss im zweiten SChritt die create_connection-Funktion von urllib3.util.connection überladen werden, 
+        um die Verbindung zu der target_ip herzustellen (Monkey-Patching).
+
+        """
+        if self.target_ip and self.tls_hostname:
+            kwargs['assert_hostname'] = self.tls_hostname
+            kwargs['server_hostname'] = self.tls_hostname
             
+            original_create_connection = urllib3.util.connection.create_connection
+            target_ip = self.target_ip
+            
+            def custom_create_connection(address, *args, **kwargs):
+                """
+                Funktion um die create_connection-Funktion von urllib3.util.connection zu überladen (Monkey Patching).
+                Hier sollen Verbindungen die an die tls_hostname gehen, auf die target_ip umgeleitet werden.
+                Falls die Verbindung nicht an den tls_hostname geht, wird die originale create_connection-Funktion aufgerufen.
+                """
+                host, port = address
+                if host == self.tls_hostname:
+                    logger.debug(f"Redirecting connection from {host}:{port} to {target_ip}:{port}")
+                    return original_create_connection((target_ip, port), *args, **kwargs)
+                else:
+                    return original_create_connection(address, *args, **kwargs)
+            
+            # Monkey-Patching der create_connection-Funktion von urllib3.util.connection
+            urllib3.util.connection.create_connection = custom_create_connection
+            
+        return super().init_poolmanager(*args, **kwargs)
             
 
 def find_p12(user_config_dir: str) -> str:
@@ -58,9 +107,5 @@ def find_p12(user_config_dir: str) -> str:
         raise KonnektorException(
             message="Certificate file not found",
             error_code=ErrorCodes.KONNEKTOR_INIT_FAILED,
-            status_code=status.INTERNAL_SERVER_ERROR,
-            detail={
-                "path": user_config_dir,
-                "resolution": "Please ensure the certificate exists in the config directory and is named with a .p12 extension.",
-            },
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
