@@ -1,46 +1,62 @@
-# PyProject configuration for the ePA3-Service package.
-# https://packaging.python.org/en/latest/guides/writing-pyproject-toml/
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [project]
-name = "epa3-service"
-version = "1.0.1"
-description = "Client utilities for interacting with the German electronic patient record (ePA) 3.x"
+name = "epa-core"
+version = "1.2.0"
+description = "Shared VAU, SOAP/XML, Konnektor, IDP and truststore implementation for ePA 3.x"
 readme = "README.md"
 license-files = ["LICENSE"]
 requires-python = ">=3.12,<4.0"
-authors = [
-    { name = "fbeta GmbH" },
+authors = [{ name = "fbeta GmbH" }]
+keywords = ["ePA", "gematik", "VAU", "Konnektor", "IDP", "SOAP"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
 ]
-
-[dependency-groups]
-# https://pip.pypa.io/en/stable/user_guide/#dependency-groups
-# https://packaging.python.org/en/latest/specifications/dependency-groups/
-# pip install --group default
-default = [
+dependencies = [
     "asn1crypto==1.5.1",
-    "cbor2==5.9.0",
+    "cbor2>=6.1,<7",
     "coloredlogs==15.0.1",
-    "cryptography==48.0.0",
+    "cryptography>=48.0,<49",
     "ecdsa==0.19.2",
-    "fastapi==0.136.1",
-    "icecream==2.2.0",
-    "jinja2==3.1.6",
     "jsonschema==4.26.0",
     "jwcrypto==1.5.7",
-    "lxml==6.1.0",
-    "oqs==0.10.2",
+    "lxml>=6.1,<7",
+    "pydantic>=2.8,<3",
     "pyhanko-certvalidator==0.31.1",
     "pyjson5==2.0.0",
     "pymtom_xop==0.0.2",
-    "python-dotenv==1.2.2",
-    "python-multipart==0.0.27",
-    "requests==2.33.1",
+    "python-dotenv>=1.2,<2",
+    "requests>=2.33,<3",
     "requests_pkcs12==1.27",
-    "zeep==4.3.2",
-    "liboqs-python @ git+https://github.com/open-quantum-safe/liboqs-python.git@9ab93b648e0253087f3c627af3674c058ede391b#egg=liboqs-python"
+    "zeep>=4.3,<5",
+    "liboqs-python @ git+https://github.com/open-quantum-safe/liboqs-python.git@9ab93b648e0253087f3c627af3674c058ede391b",
 ]
 
+[project.optional-dependencies]
+test = [
+    "pytest>=7.4",
+    "requests-mock>=1.11",
+    "pyjwt>=2.13",
+]
 
 [project.urls]
 Homepage = "https://fbeta.de/ti-support/"
 Repository = "https://github.com/fbeta-GmbH/ePA3-Service-OpenSource"
+Issues = "https://github.com/fbeta-GmbH/ePA3-Service-OpenSource/issues"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+epa_core = ["**/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
