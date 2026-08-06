@@ -6,7 +6,7 @@ from collections import OrderedDict, defaultdict
 from pyjson5 import load as json5_load
 import os
 import argparse
-from epa_core.runtime_config.constants import DIGA_PROFESSION_OID
+from epa_core.runtime_config.constants import Config
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config")
 
@@ -225,8 +225,8 @@ def load_ig_configuration() -> OrderedDict:
     Load the appropriate Implementation Guide configuration based on the professionOID in the SMC-B certificate.
     Overrides practiceSettingCode and healthcareFacilityTypeCode from environment variables if set.
     """
-    profession_oid = os.environ.get('OID_DIGA', DIGA_PROFESSION_OID)
-    is_diga = profession_oid == DIGA_PROFESSION_OID
+    profession_oid = os.environ.get('OID_DIGA', Config.DIGA_PROFESSION_OID)
+    is_diga = profession_oid == Config.DIGA_PROFESSION_OID
     config_file = 'documentSetRequest_ig-diga_V_1_1.json' if is_diga else 'documentSetRequest_ig-le_V_1_0.json'
     with open(os.path.join(CONFIG_PATH, config_file), "r", encoding="utf-8") as f:
         result = convert_metadata_list_to_dict(json5_load(f, object_pairs_hook=OrderedDict)['elements'][0]['metadata'])

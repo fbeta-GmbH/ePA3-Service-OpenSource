@@ -9,7 +9,7 @@ import urllib3.util.connection
 from epa_core.http_status import status
 
 from epa_core.exceptions import ErrorCodes, KonnektorException
-from epa_core.runtime_config.logging import logger
+from epa_core.runtime_config.constants import Config
 
 
 class PinnedPkcs12Adapter(requests_pkcs12.Pkcs12Adapter):
@@ -63,7 +63,7 @@ class PinnedPkcs12Adapter(requests_pkcs12.Pkcs12Adapter):
                 """
                 host, port = address
                 if host == self.tls_hostname:
-                    logger.debug(f"Redirecting connection from {host}:{port} to {target_ip}:{port}")
+                    Config.logger.debug(f"Redirecting connection from {host}:{port} to {target_ip}:{port}")
                     return original_create_connection((target_ip, port), *args, **kwargs)
                 else:
                     return original_create_connection(address, *args, **kwargs)
@@ -95,16 +95,16 @@ def find_p12(user_config_dir: str) -> str:
         # Use the first .p12 file found
         if len(p12_files) > 1:
             p12_files.sort(key=lambda x: os.path.basename(x).lower())  # Sort alphabetically by filename
-            logger.warning(
+            Config.logger.warning(
                 f"Multiple .p12 files found. Using the first one (alphabetically): {os.path.basename(p12_files[0])}"
             )
 
         cert_path = p12_files[0]
 
-        logger.info(f"Found .p12 certificate file: {os.path.abspath(cert_path)}")
+        Config.logger.info(f"Found .p12 certificate file: {os.path.abspath(cert_path)}")
         return cert_path
     except Exception as e:
-        logger.error("Certificate file not found")
+        Config.logger.error("Certificate file not found")
         raise KonnektorException(
             message="Certificate file not found",
             error_code=ErrorCodes.KONNEKTOR_INIT_FAILED,
