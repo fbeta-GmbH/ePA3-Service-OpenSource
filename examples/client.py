@@ -2,17 +2,19 @@ import os
 
 import json
 
+import requests
+
 from epa_core import DATA_DIR, USER_CONFIG_DIR, bootstrap_environment
 
 bootstrap_environment(USER_CONFIG_DIR)
 from epa_core.konnektor.pkcs12adapter import find_p12
 from epa_core.runtime_config.logging import logger
 
-from epa_core.vau import VAUProtokoll
+from epa_core.vau import InnerHttpRequest, VAUProtokoll
 from epa_core.konnektor import Konnektor
 from epa_core.idp_handler import identityprovider
 
-from epa_core.utils import utils
+import epa_core.utils.utils as utils
 from epa_core.xml_service.soap_client import SoapClient
 
 
@@ -101,18 +103,42 @@ def send_document_to_epa(metadata: dict, document_file_name: str):
             document_upload_request_data, _ = SoapClient.create_upload_request(metadata)
             document_upload_message = SoapClient.build_epa_add_document_message(document_upload_request_data, AS_URL, document_path=document_file_location)
 
-            # Use the fixed header in the upload
-            response = vau_con.upload_document(
-                vau_np=vau_np,
-                soap_message=document_upload_message["package"],
-                boundary_string=document_upload_message["boundary"],
-                insurant_id=metadata['insurantId']
+            content_type = (
+                'multipart/related;start-info="application/soap+xml";'
+                'type="application/xop+xml";'
+                'action="urn:ihe:iti:2007:ProvideAndRegisterDocumentSet-b";'
+                f'boundary={document_upload_message["boundary"]}'
             )
-            if response['body']['status'] == 'urn:oasis:names:tc:ebxml-regrep:ResponseStatusType:Success':
+            inner = vau_con.execute(
+                InnerHttpRequest(
+                    method="POST",
+                    path="/epa/xds-document/api/I_Document_Management",
+                    insurant_id=metadata["insurantId"],
+                    headers={"Content-Type": content_type},
+                    body=document_upload_message["package"],
+                ),
+                vau_np=vau_np,
+            )
+            response_obj = requests.Response()
+            if isinstance(inner.body, bytes):
+                response_obj._content = inner.body
+            elif isinstance(inner.body, str):
+                response_obj._content = inner.body.encode("utf-8")
+            else:
+                response_obj._content = json.dumps(inner.body).encode("utf-8")
+            response_obj.status_code = inner.status_code
+            response_obj.encoding = "utf-8"
+            response_obj.headers = dict(inner.headers)
+            response_body = SoapClient.parse_xml_response(
+                response_obj,
+                SoapClient.Services.DocumentService.I_Document_Management.DocumentRepository_ProvideAndRegisterDocumentSet_b,
+            )
+            utils.check_upload_response_for_errors(response_body)
+            if response_body['status'] == 'urn:oasis:names:tc:ebxml-regrep:ResponseStatusType:Success':
                 logger.info("Document uploaded successfully")
             else:
-                reg_errors = response['body'].get('RegistryErrorList', {}).get('RegistryError', [])
-                raise ValueError(f"Document upload failed with errors: {', '.join([f"{e['errorCode']} ({e['codeContext']})" for e in reg_errors])}. Details: {json.dumps(response['body']['RegistryErrorList'], indent=4)}")
+                reg_errors = response_body.get('RegistryErrorList', {}).get('RegistryError', [])
+                raise ValueError(f"Document upload failed with errors: {', '.join([f"{e['errorCode']} ({e['codeContext']})" for e in reg_errors])}. Details: {json.dumps(response_body['RegistryErrorList'], indent=4)}")
 
         logger.info("--------------SEND DATA ABGESCHLOSSEN------------------")
 

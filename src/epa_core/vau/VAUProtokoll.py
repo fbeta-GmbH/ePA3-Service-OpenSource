@@ -17,12 +17,11 @@ import cbor2
 import requests
 from epa_core.http_status import status
 
-from epa_core.exceptions import AuthenticationException, AuthorizationException, DocumentException, ErrorCodes, VAUException
+from epa_core.exceptions import AuthenticationException, AuthorizationException, ErrorCodes, VAUException
 from epa_core.runtime_config.logging import logger
 from epa_core.runtime_config.constants import EPA_ENVIRONMENT, HTTPS_TIMEOUT, TI_CA_BUNDLE, USER_AGENT, EpaEnvs
 from epa_core.vau import kemvau, utils, validator
 from epa_core.vau.http import InnerHttpRequest, InnerHttpResponse
-from epa_core.xml_service.soap_client import SoapClient
 
 
 class VAUKanal:
@@ -692,93 +691,6 @@ class VAUKanal:
                 error_code=ErrorCodes.EPA_AUTHZ_ERROR,
                 status_code=status.HTTP_401_UNAUTHORIZED
             )
-
-    def upload_document(
-        self, vau_np: str, soap_message: bytes, boundary_string: str, insurant_id: str
-    ) -> dict:
-        """
-        Uploads a document to the specified endpoint using a SOAP message.
-        Args:
-                vau_np (str): The VAU-NP Token.
-                soap_message (str): The SOAP message to be sent in the request body.
-                boundary_string (str): The boundary string for the multipart content type.
-        Returns:
-                dict: The parsed response from the server.
-        Raises:
-                Any exceptions raised by the `send_vau_message` or `parse_inner_http_response` methods.
-
-        """
-
-        try:
-
-            logger.info("Uploading document")
-
-            content_type = f'multipart/related;start-info="application/soap+xml";type="application/xop+xml";action="urn:ihe:iti:2007:ProvideAndRegisterDocumentSet-b";boundary={boundary_string}'
-
-            body = soap_message
-
-            inner_request = self.build_inner_header(
-                "POST /epa/xds-document/api/I_Document_Management",
-                insurant_id,
-                accept_type=None,
-                content_type=content_type,
-                content_length=len(body),
-            )
-            
-            inner_request = inner_request.encode("utf-8") + body
-
-            # Read and store the soap message log content
-            # os.makedirs("temp", exist_ok=True)
-            # with open("temp/soap_message_log.txt", "wb") as file:
-            #     file.write(inner_request)
-
-            logger.debug("Inner HTTP request: %s", inner_request)
-
-            decrypted_resp = self.send_vau_message(inner_request, vau_np=vau_np)
-
-            parsed_decrypted_resp = self.parse_inner_http_response(decrypted_resp)
-            logger.debug(
-                "Upload document response: %s",
-                json.dumps(parsed_decrypted_resp, indent=4),
-            )
-
-            # Parse the decrypted response with zeep
-            response_obj = requests.Response()
-            body = parsed_decrypted_resp["body"]
-            if isinstance(body, bytes):
-                response_obj._content = body
-            elif isinstance(body, str):
-                response_obj._content = body.encode("utf-8")
-            else:
-                response_obj._content = json.dumps(body).encode("utf-8")
-            response_obj.status_code = int(
-                parsed_decrypted_resp["http_status"].split(" ")[1]
-            )
-            response_obj.encoding = "utf-8"
-            response_obj.headers = parsed_decrypted_resp["headers"]
-
-            parsed_decrypted_resp["body"] = SoapClient.parse_xml_response(
-                response_obj,
-                SoapClient.Services.DocumentService.I_Document_Management.DocumentRepository_ProvideAndRegisterDocumentSet_b,
-            )
-            
-            utils.check_upload_response_for_errors(parsed_decrypted_resp["body"])
-
-            return parsed_decrypted_resp
-        
-        except (DocumentException, AuthorizationException):
-            raise
-        except (requests.exceptions.SSLError, SSLCertVerificationError):
-            raise
-        except Exception as e:
-
-            raise VAUException(
-                message=f"Error when sending a document to the ePA: {str(e)}",
-                error_code=ErrorCodes.EPA_SEND_ERROR,
-                status_code=status.HTTP_502_BAD_GATEWAY
-            )
-
-
 
     def to_bytes(self) -> bytes:
         """Convert VAUKanal instance to bytes for Redis storage"""

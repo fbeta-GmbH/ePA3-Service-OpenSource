@@ -36,12 +36,6 @@ dependencies = [
     "liboqs-python @ git+https://github.com/open-quantum-safe/liboqs-python.git@9ab93b648e0253087f3c627af3674c058ede391b",
 ]
 
-[project.optional-dependencies]
-test = [
-    "pytest>=7.4",
-    "requests-mock>=1.11",
-    "pyjwt>=2.13",
-]
 
 [project.urls]
 Homepage = "https://fbeta.de/ti-support/"
