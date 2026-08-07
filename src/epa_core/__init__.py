@@ -33,4 +33,4 @@ def bootstrap_environment(user_config_dir: str | Path | None = None, *, require_
 
 __all__ = ["DATA_DIR", "TEMP_DIR", "USER_CONFIG_DIR", "bootstrap_environment", "__version__"]
 
-__version__ = "2.0.0.dev1"
+__version__ = "2.0.0.dev2"

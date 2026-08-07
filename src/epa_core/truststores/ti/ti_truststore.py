@@ -329,19 +329,37 @@ class TI_Truststore:
         if not self.provider_mapping:
             logger.warning("No providers configured. Cannot verify CA bundle.")
             return False
-        as_url = None
-        try:
-            for provider_name, provider_id in self.provider_mapping.items():
-                as_url = self.epa_envs.get_as_url(str(provider_id))
-                response = requests.get(as_url, timeout=self.https_timeout, verify=ca_bundle_path)
-                logger.info(f"AS URL {as_url} is reachable with status code {response.status_code}.")
-            return True
-        except requests.exceptions.SSLError as e:
-            logger.warning(f"SSL error when connecting to AS URL {as_url}: {e}. Attempting to refresh CA bundle.")
-            return False
-        except requests.RequestException as e:
-            logger.error(f"Error when connecting to AS URL {as_url}: {e}.")
-            return False
+
+        for provider_name, provider_id in self.provider_mapping.items():
+            as_url = self.epa_envs.get_as_url(str(provider_id))
+
+            try:
+                response = requests.get(
+                    as_url,
+                    timeout=self.https_timeout,
+                    verify=ca_bundle_path,
+                )
+                logger.info(
+                    "AS URL %s is reachable with status code %s.",
+                    as_url,
+                    response.status_code,
+                )
+            except requests.exceptions.SSLError as exc:
+                logger.warning(
+                    "SSL error when connecting to AS URL %s: %s.",
+                    as_url,
+                    exc,
+                )
+                return False
+            except requests.RequestException as exc:
+                logger.warning(
+                    "AS URL %s is currently not reachable; "
+                    "this does not invalidate the TI CA bundle: %s",
+                    as_url,
+                    exc,
+                )
+
+        return True
     
     
     def _list_files(self, url:str, regex: re.Pattern) -> list[str]:
