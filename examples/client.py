@@ -12,7 +12,7 @@ from epa_core.vau import VAUProtokoll
 from epa_core.konnektor import Konnektor
 from epa_core.idp_handler import identityprovider
 
-import epa_core.utils.utils as utils
+from epa_core.utils import utils
 from epa_core.xml_service.soap_client import SoapClient
 
 
