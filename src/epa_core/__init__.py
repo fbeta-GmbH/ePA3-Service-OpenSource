@@ -8,8 +8,6 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
-from epa_core.runtime_config.constants import Config
-from epa_core.vau.validator import _load_ti_trust_roots
 
 _PACKAGE_DIR = Path(__file__).resolve().parent
 _PROJECT_ROOT = _PACKAGE_DIR.parent.parent
@@ -30,6 +28,7 @@ _ensure_openssl_conf()
 
 def bootstrap_environment(user_config_dir: str | Path | None = None, *, require_env_file: bool = True) -> Path:
     """Configure OpenSSL and load the application's .env file explicitly."""
+    from epa_core.runtime_config.constants import Config
 
     config_dir = Path(user_config_dir) if user_config_dir is not None else _DEFAULT_USER_CONFIG_DIR
 
@@ -41,7 +40,6 @@ def bootstrap_environment(user_config_dir: str | Path | None = None, *, require_
         raise RuntimeError(f"User config file not found: {env_file}")
 
     Config.init(config_dir, TEMP_DIR, DATA_DIR)
-    _load_ti_trust_roots()
     return config_dir
 
 __all__ = ["bootstrap_environment", "__version__"]

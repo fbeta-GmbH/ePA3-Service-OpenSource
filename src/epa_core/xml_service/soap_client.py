@@ -36,8 +36,7 @@ from epa_core.xml_service.documentSetRequest_model import (
 from epa_core.xml_service.generated_wsdl_classes import (
     CONN_AUTHSIGNATURESERVICE_V7_4_1, CONN_CERTIFICATESERVICE_V6_0_1, CONN_CARDSERVICE,
     CONN_EVENTSERVICE, XDSDOCUMENTSERVICE, WsdlOperation, WsdlService)
-from epa_core.runtime_config.constants import get_author, get_institution, get_author_role
-
+from epa_core.runtime_config.constants import get_author, get_institution, get_author_role, Config
 
 class SoapClient:
     """

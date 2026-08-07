@@ -20,6 +20,7 @@ from epa_core.utils.cert_data_util import ReadCertData
 from epa_core.runtime_config.constants import Config, set_telematik_id, set_cert_author_fields
 
 bootstrap_environment(Path("config"))
+
 def _init_and_authenticate(insurant_id: str):
         """Initialize Konnektor, IDP and VAU session, authenticate and return (vau_con, vau_np)."""
         Config.logger.info("Starting ePA-Client")

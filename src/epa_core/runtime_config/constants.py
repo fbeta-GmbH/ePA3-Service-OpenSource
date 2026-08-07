@@ -1,10 +1,11 @@
 import logging
 import os
+from pathlib import Path
+from typing import ClassVar
+from asn1crypto import x509 as asn1_x509
 from epa_core.runtime_config.data.konnektor_tls_mode import KonnektorTlsMode
 from epa_core.runtime_config.epa_env import EpaEnvs, EpaEnvConfig
 from epa_core.runtime_config.logging import setup_logging
-
-RECORD_PROVIDER_MAPPING: dict[str, int] = {}
 
 # DiGA professionOID - all other OIDs are treated as LE (Leistungserbringer)
 # See: gemSpec_OID Tab_PKI_403 (oid_diga = DiGA-Hersteller und -Anbieter)
@@ -161,49 +162,51 @@ def get_as_url(epa_env: EpaEnvConfig, provider_id: str) -> str:
     return epa_env.get_as_url(provider_id)
 
 class Config:
-    EPA_ENVIRONMENT = 'RT'
+    EPA_ENVIRONMENT: ClassVar[str] = 'RT'
 
-    USER_AGENT = ''
+    USER_AGENT: ClassVar[str] = ''
 
-    DIGA_NAME = ''
-    DIGA_MANUFACTURER = ''
-    SW_ADDITION_1 = ''
-    SW_ADDITION_2 = ''
-    SW_ADDITION_3 = ''
+    DIGA_NAME: ClassVar[str] = ''
+    DIGA_MANUFACTURER: ClassVar[str] = ''
+    SW_ADDITION_1: ClassVar[str] = ''
+    SW_ADDITION_2: ClassVar[str] = ''
+    SW_ADDITION_3: ClassVar[str] = ''
 
-    MANDANT_ID =''
-    CLIENT_SYSTEM_ID = ''
-    WORKPLACE_ID = ''
-    USER_ID = ''
+    MANDANT_ID: ClassVar[str] =''
+    CLIENT_SYSTEM_ID: ClassVar[str] = ''
+    WORKPLACE_ID: ClassVar[str] = ''
+    USER_ID: ClassVar[str] = ''
 
-    KONNEKTOR_CERT_PW = ''
-    HTTPS_TIMEOUT = 30
+    KONNEKTOR_CERT_PW: ClassVar[str] = ''
+    HTTPS_TIMEOUT: ClassVar[int] = 30
 
-    IDP_AUTH_PATH = "/auth"
+    IDP_AUTH_PATH: ClassVar[str] = "/auth"
 
-    KONNEKTOR_URL = ''
-    TI_CA_BUNDLE = ''
+    KONNEKTOR_URL: ClassVar[str] = ''
+    TI_CA_BUNDLE: ClassVar[str] = ''
 
-    KONNEKTOR_TLS_MODE = KonnektorTlsMode.SMC_K.value
-    KONNEKTOR_TLS_HOSTNAME = None
+    KONNEKTOR_TLS_MODE: ClassVar[str] = KonnektorTlsMode.SMC_K.value
+    KONNEKTOR_TLS_HOSTNAME: ClassVar[str | None] = None
 
-    KONNEKTOR_IP = None
-    KONNEKTOR_CA_BUNDLE = None
+    KONNEKTOR_IP: ClassVar[str | None] = None
+    KONNEKTOR_CA_BUNDLE: ClassVar[str | None] = None
 
-    TI_PKI_ROOTS_DIR = ''
-    TI_TRUST_ROOTS = []
+    TI_PKI_ROOTS_DIR: ClassVar[str] = ''
+    TI_TRUST_ROOTS: ClassVar[list[asn1_x509.Certificate]] = []
 
-    USER_CONFIG_DIR = ''
-    TEMP_DIR = ''
-    DATA_DIR = ''
+    USER_CONFIG_DIR: ClassVar[Path] = Path()
+    TEMP_DIR: ClassVar[Path] = Path()
+    DATA_DIR: ClassVar[Path] = Path()
 
-    LOG_LEVEL = 'INFO'
+    LOG_LEVEL: ClassVar[str] = 'INFO'
 
-    logger = logging.getLogger()
+    logger: ClassVar[logging.Logger] = logging.getLogger()
 
     @classmethod
-    def init(cls, USER_CONFIG_DIR, TEMP_DIR, DATA_DIR):
+    def init(cls, USER_CONFIG_DIR: Path, TEMP_DIR: Path, DATA_DIR: Path):
         from epa_core.truststores.ti.ti_truststore import TI_Truststore
+        from epa_core.vau.validator import _load_ti_trust_roots
+
         cls.USER_CONFIG_DIR = USER_CONFIG_DIR
         cls.TEMP_DIR = TEMP_DIR
         cls.DATA_DIR = DATA_DIR
@@ -244,7 +247,7 @@ class Config:
         cls.WORKPLACE_ID = os.getenv('WORKPLACE_ID', cls.WORKPLACE_ID)
         cls.USER_ID = os.getenv('USER_ID', cls.USER_ID)
 
-        cls.KONNEKTOR_CERT_PW = os.getenv('KONNEKTOR_CERT_PW')
+        cls.KONNEKTOR_CERT_PW = os.getenv('KONNEKTOR_CERT_PW', cls.KONNEKTOR_CERT_PW)
 
         cls.HTTPS_TIMEOUT = int(os.getenv('HTTPS_TIMEOUT', cls.HTTPS_TIMEOUT))
 
@@ -300,6 +303,8 @@ class Config:
 
         cls.TI_PKI_ROOTS_DIR = ti_ts.get_root_ca_path()
 
+        # Load pinned TI roots once; these are the only certificates we trust as root of trust for chain validation.
+        cls.TI_TRUST_ROOTS = _load_ti_trust_roots()
 
         Config.logger.info(f"""
         Constants loaded:
