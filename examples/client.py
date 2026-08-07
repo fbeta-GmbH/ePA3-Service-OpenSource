@@ -144,7 +144,7 @@ def send_document_to_epa(metadata: dict, document_file_name: str):
 if __name__ == "__main__":
     Config.logger.info("Starting ePA client")
 
-    INSURANT_ID = "X110596703"
+    INSURANT_ID = "X99999999"
     DOCUMENT_TITLE = "Testdokument"
 
     sample_metadata = {
