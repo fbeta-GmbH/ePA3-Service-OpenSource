@@ -15,6 +15,7 @@ from epa_core.konnektor import Konnektor
 from epa_core.idp_handler import identityprovider
 
 import epa_core.utils.utils as utils
+import epa_core.vau.utils as vau_utils
 from epa_core.xml_service.soap_client import SoapClient
 
 
@@ -133,7 +134,7 @@ def send_document_to_epa(metadata: dict, document_file_name: str):
                 response_obj,
                 SoapClient.Services.DocumentService.I_Document_Management.DocumentRepository_ProvideAndRegisterDocumentSet_b,
             )
-            utils.check_upload_response_for_errors(response_body)
+            vau_utils.check_upload_response_for_errors(response_body)
             if response_body['status'] == 'urn:oasis:names:tc:ebxml-regrep:ResponseStatusType:Success':
                 logger.info("Document uploaded successfully")
             else:
