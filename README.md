@@ -11,7 +11,6 @@ Dieses Repository enthält die gemeinsam genutzten Komponenten für die ePA-3.x-
 
 Das Repository behält den Namen `ePA3-Service-OpenSource`. Das installierbare Python-Paket heißt `epa-core` und wird über `epa_core` importiert.
 
-Nicht Bestandteil des Core-Pakets sind die FastAPI-Anwendung, Redis-Sessions, die Provider-Lokalisierung sowie Search, Retrieve und die Web-UI. Diese Funktionen liegen in den darauf aufbauenden Repositories.
 
 ## Voraussetzungen
 
