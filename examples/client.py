@@ -2,11 +2,12 @@ import os
 
 import json
 
-import requests
 
 from epa_core import DATA_DIR, USER_CONFIG_DIR, bootstrap_environment
 
 bootstrap_environment(USER_CONFIG_DIR)
+
+import requests
 from epa_core.konnektor.pkcs12adapter import find_p12
 from epa_core.runtime_config.logging import logger
 
