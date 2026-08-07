@@ -1,11 +1,9 @@
-import os
+from epa_core import bootstrap_environment
 
 import json
 from pathlib import Path
 
 import requests
-
-from epa_core import bootstrap_environment
 from epa_core.konnektor.pkcs12adapter import find_p12
 
 from epa_core.vau import InnerHttpRequest, VAUProtokoll
