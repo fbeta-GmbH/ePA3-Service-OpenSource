@@ -148,7 +148,7 @@ if (-not (Test-Path $venvPath)) {
 }
 . $venvPath\Scripts\activate
 python -m pip install --upgrade pip
-python -m pip install --group default
+python -m pip install -e .
 
 Write-Output 'Dependencies installed successfully.'
 
