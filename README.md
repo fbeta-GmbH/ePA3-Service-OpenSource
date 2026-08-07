@@ -30,7 +30,7 @@ python -m pip install --upgrade pip
 python -m pip install -e .
 ```
 
-Unter Windows kann weiterhin `install_dependencies.ps1` verwendet werden:
+Unter Windows kann `install_dependencies.ps1` verwendet werden:
 
 ```powershell
 ./install_dependencies.ps1
