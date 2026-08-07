@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "epa-core"
-version = "1.2.0"
+version = "2.0.0.dev1"
 description = "Shared VAU, SOAP/XML, Konnektor, IDP and truststore implementation for ePA 3.x"
 readme = "README.md"
 license-files = ["LICENSE"]
