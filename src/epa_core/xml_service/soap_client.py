@@ -25,8 +25,6 @@ from pymtom_xop.soap_envelope import SoapEnvelope
 from pymtom_xop.xop_package import XopPackage
 
 
-from epa_core.runtime_config.logging import logger
-
 import epa_core.utils.utils as utils
 from epa_core.xml_service.documentSetRequest_model import (
     AssociationItem, ClassificationItem, Description, Document,
@@ -38,8 +36,7 @@ from epa_core.xml_service.documentSetRequest_model import (
 from epa_core.xml_service.generated_wsdl_classes import (
     CONN_AUTHSIGNATURESERVICE_V7_4_1, CONN_CERTIFICATESERVICE_V6_0_1, CONN_CARDSERVICE,
     CONN_EVENTSERVICE, XDSDOCUMENTSERVICE, WsdlOperation, WsdlService)
-from epa_core.runtime_config.constants import get_author, get_institution, get_author_role
-
+from epa_core.runtime_config.constants import get_author, get_institution, get_author_role, Config
 
 class SoapClient:
     """
@@ -73,7 +70,7 @@ class SoapClient:
             Client: A zeep Client instance configured with the WSDL and settings.
         """
         wsdl_path = os.path.join(SoapClient.DIR_PATH, *service_identifier.wsdl)
-        logger.debug(f"Connecting to WSDL: {wsdl_path}")
+        Config.logger.debug(f"Connecting to WSDL: {wsdl_path}")
 
         settings = Settings(
             strict=True,  
@@ -152,7 +149,7 @@ class SoapClient:
         try:
             client = SoapClient.get_client(selectedService)
         except KeyError:
-            logger.error(f"Invalid service type. Please choose one of: {SoapClient.Services.__dict__.keys()}")
+            Config.logger.error(f"Invalid service type. Please choose one of: {SoapClient.Services.__dict__.keys()}")
             return
         
         services_info = []
@@ -244,7 +241,7 @@ class SoapClient:
         client = SoapClient.get_client(operation.service)
 
         try:
-            logger.debug(f"Generating XML for operation '{operation}' with parameters: {params}")
+            Config.logger.debug(f"Generating XML for operation '{operation}' with parameters: {params}")
             response = client.create_message(client.service, operation.name, **params)
 
             # Ensure the namespace mapping is correct
@@ -270,8 +267,8 @@ class SoapClient:
                     classification.append(name)
 
         except Exception as e:
-            logger.error(f"Error occurred while generating XML for operation '{operation}': {e}")
-            logger.warning("Listing available operations for reference:")
+            Config.logger.error(f"Error occurred while generating XML for operation '{operation}': {e}")
+            Config.logger.warning("Listing available operations for reference:")
             SoapClient.list_operations(operation.service, operation)
             raise
         
@@ -280,7 +277,7 @@ class SoapClient:
         
         generated_xml = etree.tostring(response, pretty_print=True, xml_declaration=False, encoding='utf-8').decode()
 
-        logger.debug(f"Generated XML for operation '{operation}': \n{generated_xml}")
+        Config.logger.debug(f"Generated XML for operation '{operation}': \n{generated_xml}")
         return generated_xml
     
     @staticmethod
@@ -300,18 +297,18 @@ class SoapClient:
 
         try:
             # Parse the XML response 
-            logger.debug(f"Processing response for operation '{operation.name}': {response.content}")
+            Config.logger.debug(f"Processing response for operation '{operation.name}': {response.content}")
             try:
                 parsed_response = binding.process_reply(client, operation, response)
             except zeep.exceptions.TransportError as e:
                 if response.status_code >= status.HTTP_400_BAD_REQUEST:
-                    logger.error(f"Response status code: {response.status_code}")
+                    Config.logger.error(f"Response status code: {response.status_code}")
                     return {"Status": {"Result": "Error", "Error": f"HTTP Error {response.status_code}"}}
 
             # Convert the parsed response to a dictionary
             parsed_response = serialize_object(parsed_response)
         except zeep.exceptions.Fault as e:
-            logger.error(f"Zeep Fault: {e}")
+            Config.logger.error(f"Zeep Fault: {e}")
             return {"Status": {"Result": "XML_FAULT", "Error": str(e)}}
         except Exception as e:
             raise ValueError(f"Error proccessing response for operation '{operation.name}' ({e})")
@@ -319,7 +316,7 @@ class SoapClient:
         if not parsed_response:
             raise ValueError(f"Empty response for operation '{operation.name}'")
         
-        logger.debug(f"Parsed XML of '{operation.name}': {json.dumps(parsed_response, indent=4, default=str)}")
+        Config.logger.debug(f"Parsed XML of '{operation.name}': {json.dumps(parsed_response, indent=4, default=str)}")
         
         if not isinstance(parsed_response, dict):
             raise ValueError(f"Unexpected response type for operation '{operation.name}': {type(parsed_response)}")
@@ -393,7 +390,7 @@ class SoapClient:
         # Merge default input with user input
         input_data = utils.deep_merge_dicts(default_input, input_data)
         input_data = dict(dict_to_defaultdict(input_data))
-        logger.debug(f"Input data: {json.dumps(input_data, indent=4)}")
+        Config.logger.debug(f"Input data: {json.dumps(input_data, indent=4)}")
 
         for (a, b) in [("documentEntry", "entryUUID"), ("documentEntry", "oldEntryUUID")]:
             if input_data[a].get(b) is not None and not input_data[a][b].startswith("urn:uuid:"):
@@ -592,7 +589,7 @@ class SoapClient:
             "headers": mtom_xop_headers,
             "boundary": xop_pack.boundary.decode("utf-8")
         }
-        logger.debug(f"MTOM attachment created!")
-        logger.debug(f"Headers: {mtom_attachment_info['headers']}")
-        logger.debug(f"Boundary: {mtom_attachment_info['boundary']}")
+        Config.logger.debug(f"MTOM attachment created!")
+        Config.logger.debug(f"Headers: {mtom_attachment_info['headers']}")
+        Config.logger.debug(f"Boundary: {mtom_attachment_info['boundary']}")
         return mtom_attachment_info

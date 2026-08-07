@@ -17,7 +17,7 @@ import hashlib
 from epa_core.truststores.ti.utils import ROOT_FILE_RE, SUB_FILE_RE
 
 from epa_core.runtime_config.epa_env import EpaEnvConfig
-from epa_core.runtime_config.logging import logger
+from epa_core.runtime_config.constants import Config
 from epa_core.truststores.builder_lock import Builder_Locker
 
 from cryptography import x509
@@ -85,13 +85,13 @@ class TI_Truststore:
         """
         try:
             if not os.path.exists(self.pem_path):
-                logger.info("Initializing TI CA bundle. Building bundle.")
+                Config.logger.info("Initializing TI CA bundle. Building bundle.")
                 return self.refresh_ca_bundle()
             else:
-                logger.info("TI CA bundle already exists. Using existing bundle.")
+                Config.logger.info("TI CA bundle already exists. Using existing bundle.")
                 return self.pem_path
         except Exception as e:
-            logger.error(f"Error initial building TI CA bundle: {e}")
+            Config.logger.error(f"Error initial building TI CA bundle: {e}")
             raise
 
     
@@ -111,7 +111,7 @@ class TI_Truststore:
             
             if is_builder:    
             
-                logger.info("Refreshing CA bundle...")
+                Config.logger.info("Refreshing CA bundle...")
                 
                 root_json = self._get_root_json(self.ca_base_url_root_json, self.ca_path_root_json, force_refresh=True)
                 sub_tsl_xml = self._get_sub_tsl_xml(self.ca_tsl_xml_url, self.ca_tsl_xml_path, force_refresh=True)
@@ -128,7 +128,7 @@ class TI_Truststore:
                 ca_bundle_path = self._combine_certs_to_pem(cert_paths=file_paths, output_path=self.pem_path)
                 
                 if self.verify_bundle(ca_bundle_path):
-                    logger.info("CA bundle refreshed successfully.")  
+                    Config.logger.info("CA bundle refreshed successfully.")  
                     return ca_bundle_path
 
                 raise ssl.SSLCertVerificationError("Failed to verify TI CA bundle.")
@@ -139,7 +139,7 @@ class TI_Truststore:
                     raise FileNotFoundError("No existing CA bundle found.")
             
         except TimeoutError as e:
-            logger.error(f"Timeout while waiting for builder lock: {e}")
+            Config.logger.error(f"Timeout while waiting for builder lock: {e}")
             raise
         finally:
             if is_builder:
@@ -162,20 +162,20 @@ class TI_Truststore:
         file_paths = []
         
         for file_name in cert_name_list:
-            logger.info(f"Downloading Root CA: {file_name}...")
+            Config.logger.info(f"Downloading Root CA: {file_name}...")
             save_path = os.path.join(self.ca_path_roots, file_name)
             self._download_file(url=base_url + file_name, save_path=save_path, force_download=force_download)
             
             expected_fingerprint = fingerprint_map.get(file_name.replace(".der", "").replace("_", " ").lower())
             if not expected_fingerprint:
-                logger.warning(f"No fingerprint found for {file_name}. Skipping.")
+                Config.logger.warning(f"No fingerprint found for {file_name}. Skipping.")
                 continue
             
             if not self._check_integrity(file_path=save_path, expected_fingerprint=expected_fingerprint):
-                logger.warning(f"File {file_name} failed integrity check.")
+                Config.logger.warning(f"File {file_name} failed integrity check.")
                 continue
             
-            logger.debug(f"File {file_name} passed integrity check.")
+            Config.logger.debug(f"File {file_name} passed integrity check.")
             file_paths.append(save_path)
         
         return file_paths
@@ -247,16 +247,16 @@ class TI_Truststore:
         file_paths = []
 
         for file_name in cert_name_list:
-            logger.info(f"Downloading Sub-CA: {file_name}...")
+            Config.logger.info(f"Downloading Sub-CA: {file_name}...")
             save_path = os.path.join(self.ca_path_sub, file_name)
             self._download_file(url=base_url + file_name, save_path=save_path, force_download=force_download)
 
             actual_fingerprint = self._get_sha256_fingerprint(save_path)
             if actual_fingerprint not in fingerprint_set:
-                logger.warning(f"Sub-CA {file_name} not in TSL fingerprint list. Skipping.")
+                Config.logger.warning(f"Sub-CA {file_name} not in TSL fingerprint list. Skipping.")
                 continue
 
-            logger.debug(f"Sub-CA {file_name} validation passed.")
+            Config.logger.debug(f"Sub-CA {file_name} validation passed.")
             file_paths.append(save_path)
 
         return file_paths
@@ -306,7 +306,7 @@ class TI_Truststore:
                 fp = hashlib.sha256(der).hexdigest().lower()
                 fingerprints.add(fp)
             except Exception as e:
-                logger.warning(f"Failed to extract fingerprint from TSL certificate: {e}")
+                Config.logger.warning(f"Failed to extract fingerprint from TSL certificate: {e}")
                 continue
         
         return fingerprints
@@ -327,20 +327,20 @@ class TI_Truststore:
         """
     
         if not self.provider_mapping:
-            logger.warning("No providers configured. Cannot verify CA bundle.")
+            Config.logger.warning("No providers configured. Cannot verify CA bundle.")
             return False
         as_url = None
         try:
             for provider_name, provider_id in self.provider_mapping.items():
                 as_url = self.epa_envs.get_as_url(str(provider_id))
                 response = requests.get(as_url, timeout=self.https_timeout, verify=ca_bundle_path)
-                logger.info(f"AS URL {as_url} is reachable with status code {response.status_code}.")
+                Config.logger.info(f"AS URL {as_url} is reachable with status code {response.status_code}.")
             return True
         except requests.exceptions.SSLError as e:
-            logger.warning(f"SSL error when connecting to AS URL {as_url}: {e}. Attempting to refresh CA bundle.")
+            Config.logger.warning(f"SSL error when connecting to AS URL {as_url}: {e}. Attempting to refresh CA bundle.")
             return False
         except requests.RequestException as e:
-            logger.error(f"Error when connecting to AS URL {as_url}: {e}.")
+            Config.logger.error(f"Error when connecting to AS URL {as_url}: {e}.")
             return False
     
     
@@ -372,10 +372,10 @@ class TI_Truststore:
             save_path (str): Path to save the downloaded file.
         """
         if os.path.exists(save_path) and not force_download:
-            logger.info(f"File {save_path} already exists. Skipping download.")
+            Config.logger.info(f"File {save_path} already exists. Skipping download.")
             return
         if os.path.exists(save_path) and force_download:
-            logger.info(f"Refreshing existing file: {save_path}")
+            Config.logger.info(f"Refreshing existing file: {save_path}")
         
         response = requests.get(url, timeout=self.https_timeout)
         response.raise_for_status()

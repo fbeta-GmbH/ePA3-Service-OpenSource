@@ -10,10 +10,7 @@ from jwcrypto import common, jwe, jwk, jws
 from typing import Any
 from ssl import SSLCertVerificationError
 
-
-from epa_core.runtime_config.logging import logger
-
-from epa_core.runtime_config.constants import IDP_URL, USER_AGENT, IDP_AUTH_PATH, HTTPS_TIMEOUT
+from epa_core.runtime_config.constants import Config
 
 from epa_core.exceptions import IdentityProviderException, ErrorCodes
 class IdentityProvider:
@@ -22,7 +19,7 @@ class IdentityProvider:
         Initialize a new instance of the IdentityProvider class.
         Uses the IDP_URL constant for API endpoint configuration.
         """
-        logger.info("Initializing IdentityProvider with URL: %s", IDP_URL)
+        Config.logger.info("Initializing IdentityProvider with URL: %s", Config.IDP_URL)
         self.puk_idp_enc_url, self.puk_idp_sig_url = self.get_discovery()
 
     def get_certs(self) -> dict[str, Any]:
@@ -36,9 +33,9 @@ class IdentityProvider:
             requests.exceptions.RequestException: If the certificates cannot be retrieved
         """
         try:
-            logger.info("Getting certificates")
-            response = requests.get(IDP_URL + '/certs', timeout=HTTPS_TIMEOUT)
-            logger.debug("Certificates: %s", json.dumps(response.json(), indent=4))
+            Config.logger.info("Getting certificates")
+            response = requests.get(Config.IDP_URL + '/certs', timeout=Config.HTTPS_TIMEOUT)
+            Config.logger.debug("Certificates: %s", json.dumps(response.json(), indent=4))
             return response.json()
         except (requests.exceptions.SSLError, SSLCertVerificationError):
             raise
@@ -58,9 +55,9 @@ class IdentityProvider:
         Raises:
             requests.exceptions.RequestException: If the configuration cannot be retrieved
         """
-        logger.info("Getting OpenID configuration")
-        response = requests.get(IDP_URL + '/.well-known/openid-configuration', timeout=HTTPS_TIMEOUT)
-        logger.debug("OpenID configuration: %s", json.dumps(dict(response.headers), indent=4))
+        Config.logger.info("Getting OpenID configuration")
+        response = requests.get(Config.IDP_URL + '/.well-known/openid-configuration', timeout=Config.HTTPS_TIMEOUT)
+        Config.logger.debug("OpenID configuration: %s", json.dumps(dict(response.headers), indent=4))
         return dict(response.headers)
     
 
@@ -77,9 +74,9 @@ class IdentityProvider:
         Raises:
             requests.exceptions.RequestException: If the key cannot be retrieved
         """
-        logger.info("Getting PUK IDP SIG")
-        response = requests.get(self.puk_idp_sig_url, timeout=HTTPS_TIMEOUT)
-        logger.debug("PUK IDP SIG: %s", json.dumps(response.json(), indent=4))
+        Config.logger.info("Getting PUK IDP SIG")
+        response = requests.get(self.puk_idp_sig_url, timeout=Config.HTTPS_TIMEOUT)
+        Config.logger.debug("PUK IDP SIG: %s", json.dumps(response.json(), indent=4))
         return response.text
     
 
@@ -97,9 +94,9 @@ class IdentityProvider:
         Raises:
             requests.exceptions.RequestException: If the key cannot be retrieved
         """
-        logger.info("Getting PUK IDP ENC")
-        response = requests.get(self.puk_idp_enc_url, timeout=HTTPS_TIMEOUT)
-        logger.debug("PUK IDP ENC: %s", json.dumps(response.json(), indent=4))
+        Config.logger.info("Getting PUK IDP ENC")
+        response = requests.get(self.puk_idp_enc_url, timeout=Config.HTTPS_TIMEOUT)
+        Config.logger.debug("PUK IDP ENC: %s", json.dumps(response.json(), indent=4))
         return response.text
 
 
@@ -116,9 +113,9 @@ class IdentityProvider:
         Raises:
             requests.exceptions.RequestException: If the key cannot be retrieved
         """
-        logger.info("Getting PUK IDP SEK")
-        response = requests.get(IDP_URL + '/certs/puk_idp_sek', timeout=HTTPS_TIMEOUT)
-        logger.debug("PUK IDP SEK: %s", json.dumps(response.json(), indent=4))
+        Config.logger.info("Getting PUK IDP SEK")
+        response = requests.get(Config.IDP_URL + '/certs/puk_idp_sek', timeout=Config.HTTPS_TIMEOUT)
+        Config.logger.debug("PUK IDP SEK: %s", json.dumps(response.json(), indent=4))
         return response.text
     
     def get_discovery(self) -> tuple[str, str]:
@@ -131,9 +128,10 @@ class IdentityProvider:
         Raises:
             requests.exceptions.RequestException: If the configuration cannot be retrieved
         """
-        logger.info("Getting discovery configuration")
+        Config.logger.info("Getting discovery configuration")
         try:
-            response = requests.get(IDP_URL + '/.well-known/openid-configuration', timeout=HTTPS_TIMEOUT)
+            Config.logger.info("Requesting discovery configuration from IDP")
+            response = requests.get(Config.IDP_URL + '/.well-known/openid-configuration', timeout=Config.HTTPS_TIMEOUT)
             response.raise_for_status()
 
             try:
@@ -179,9 +177,9 @@ class IdentityProvider:
         Returns:
             bool: True if signature is valid, False otherwise
         """
-        logger.info("Verifying challenge token")
+        Config.logger.info("Verifying challenge token")
         if not challenge_token:
-            logger.error("Challenge token is None")
+            Config.logger.error("Challenge token is None")
             raise IdentityProviderException(
                 message="Challenge token cannot be None",
                 error_code=ErrorCodes.IDP_VERIFICATION_ERROR,
@@ -191,7 +189,7 @@ class IdentityProvider:
         # Decode challenge token
         challenge_token_jws = jws.JWS()
         challenge_token_jws.deserialize(challenge_token)
-        logger.debug("Challenge token decoded (without signature): %s", challenge_token_jws)
+        Config.logger.debug("Challenge token decoded (without signature): %s", challenge_token_jws)
 
         # Get public key from IDP (PUK_IDP_SIG)
         public_key_json = json.loads(self.get_puk_idp_sig())
@@ -206,16 +204,16 @@ class IdentityProvider:
         data_bytes =  (header + '.' + payload).encode()
         signature_bytes = common.base64url_decode(signature)
 
-        logger.debug("Data bytes: %s", data_bytes)
-        logger.debug("Signature bytes: %s", signature_bytes)
+        Config.logger.debug("Data bytes: %s", data_bytes)
+        Config.logger.debug("Signature bytes: %s", signature_bytes)
         
         # use the verifying key to verify the signature with the data 
         try:
             verifying_key.verify(signature_bytes, data_bytes)
-            logger.info("Challenge token signature verified successfully")
+            Config.logger.info("Challenge token signature verified successfully")
             return True
         except ecdsa.BadSignatureError:
-            logger.error("Challenge token signature verification failed")
+            Config.logger.error("Challenge token signature verification failed")
             return False
         
     def auth_build_inner_header_payload(self, challenge_token: str, card_cert: str) -> str:
@@ -264,13 +262,13 @@ class IdentityProvider:
         Raises:
             requests.exceptions.RequestException: If the authentication request fails
         """
-        logger.info("Building auth NJWT")
-        logger.debug("Signature: %s", signature)
+        Config.logger.info("Building auth NJWT")
+        Config.logger.debug("Signature: %s", signature)
         urlsafe_signature = signature.replace('+', '-').replace('/', '_')
-        logger.debug("Signature urlsafe: %s", urlsafe_signature)
+        Config.logger.debug("Signature urlsafe: %s", urlsafe_signature)
         inner_signed_jws = f"{header_payload_challenge_string}.{urlsafe_signature}"
 
-        logger.debug("Inner signed JWS: %s", inner_signed_jws)
+        Config.logger.debug("Inner signed JWS: %s", inner_signed_jws)
 
         outer_header = {
             "alg" : "ECDH-ES",
@@ -293,21 +291,21 @@ class IdentityProvider:
         
         encrypted_njwt = jwe_token.serialize(compact=True)
 
-        logger.debug("Encrypted NJWT: %s", encrypted_njwt)
+        Config.logger.debug("Encrypted NJWT: %s", encrypted_njwt)
 
         data = {
             'signed_challenge': encrypted_njwt
         }
 
-        response = requests.post(IDP_URL + IDP_AUTH_PATH, data=data, timeout=HTTPS_TIMEOUT, allow_redirects=False, headers={
-            "x-useragent": USER_AGENT,
+        response = requests.post(Config.IDP_URL + Config.IDP_AUTH_PATH, data=data, timeout=Config.HTTPS_TIMEOUT, allow_redirects=False, headers={
+            "x-useragent": Config.USER_AGENT,
         })
-        logger.debug("Auth NJWT response: %s", response.headers)
-        logger.debug("Auth NJWT response body: %s", response.text)
+        Config.logger.debug("Auth NJWT response: %s", response.headers)
+        Config.logger.debug("Auth NJWT response body: %s", response.text)
 
         parsed_location_url = urllib.parse.urlparse(response.headers['Location'])
         response_queries = urllib.parse.parse_qs(parsed_location_url.query)
-        logger.debug("Auth NJWT response queries: %s", response_queries)
+        Config.logger.debug("Auth NJWT response queries: %s", response_queries)
 
         auth_code = response_queries['code'][0]
 
