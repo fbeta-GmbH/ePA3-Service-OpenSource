@@ -1,18 +1,37 @@
 # ePA 3.x Integration
 
-Dieses Projekt implementiert:
-- den AuthZ-Workflow für die elektronische Patientenakte (ePA) 3.x.
-- das Schreiben eines Medizinischen Informationsobjekt (MIO) in die elektronische Patientenakte.
+Dieses Repository enthält die gemeinsam genutzten Komponenten für die ePA-3.x-Integration:
+
+- VAU-Kanal und verschlüsselter Nachrichtentransport
+- Kommunikation mit dem Konnektor
+- Authentifizierung über den zentralen IDP
+- TI-Truststore und Zertifikatsprüfung
+- gemeinsame SOAP-/XML-Verarbeitung
+- Erzeugung der Requests für den Dokumenten-Upload
+
+Das Repository behält den Namen `ePA3-Service-OpenSource`. Das installierbare Python-Paket heißt `epa-core` und wird über `epa_core` importiert.
+
+Nicht Bestandteil des Core-Pakets sind die FastAPI-Anwendung, Redis-Sessions, die Provider-Lokalisierung sowie Search, Retrieve und die Web-UI. Diese Funktionen liegen in den darauf aufbauenden Repositories.
 
 ## Voraussetzungen
 
 - Python 3.12 oder höher
-- PowerShell
-- TI-Terminal-CA (Konnektor) Zertifikat als `.p12`-Datei
+- TI-Terminal-CA-Konnektor
+- Konnektor-Zertifikat als `.p12`-Datei
+- Zugriff auf die verwendete TI-Umgebung
+
+Für `liboqs` werden auf Linux zusätzlich CMake, ein C-Compiler und die OpenSSL-Header benötigt.
 
 ## Installation
 
-Um alle notwendigen Abhängigkeiten zu installieren, führen Sie das Skript `install_dependencies.ps1` aus:
+```bash
+python3.12 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e .
+```
+
+Unter Windows kann weiterhin `install_dependencies.ps1` verwendet werden:
 
 ```powershell
 ./install_dependencies.ps1
@@ -20,78 +39,61 @@ Um alle notwendigen Abhängigkeiten zu installieren, führen Sie das Skript `ins
 
 ## Umgebungskonfiguration
 
-1. Kopieren Sie die Datei `config/.env.template` zu `config/.env`:
+1. Kopieren Sie die Datei `config/.env.template` nach `config/.env`:
+
    ```bash
    cp config/.env.template config/.env
    ```
 
-2. Füllen Sie die folgenden Umgebungsvariablen in der Datei `config/.env` aus:
+2. Legen Sie das Konnektor-Zertifikat als `.p12`-Datei im Verzeichnis `config/` ab.
 
-### Basis-Konfiguration
-- `EPA_ENVIRONMENT`: Umgebung der ePA (z. B. `RU`, `RT`, `PROD`)
-- `DEFAULT_EPA_PROVIDER_ID`: ID des ePA-Aktenkontoanbieters (z. B. `1` für IBM, `2` für Bitmarck Technik / RISE)
-- `USER_AGENT`: User Agent String für HTTP-Requests
-- `KONNEKTOR_URL`: URL des Konnektors
-- `KONNEKTOR_CERT_PW`: Passwort für das Konnektor `.p12`-Zertifikat
-- `KONNEKTOR_TLS_MODE`: Modus für den TLS-Handshake mit dem Konnektor. Optionen:
-  - `"smc_k"` (empfohlen): TLS-Handshake mit gSMC-K-Zertifikat. Validierung über TI-Truststore.
-  - `"alternative"`: TLS-Handshake mit alternativem Zertifikat (Konnektor-eigenes Zertifikat muss in `config/ssl/konnektor/cert.pem` hinterlegt werden).
-  - `"insecure"`: TLS-Zertifikatsprüfung deaktiviert (unsicher, NICHT für Produktion geeignet).
-- `HTTPS_TIMEOUT`: Timeout für HTTPS-Anfragen in Sekunden (Standard: `30`)
-- `RECORD_PROVIDER_1`: Name des ersten ePA-Providers (z. B. `IBM`)
-- `RECORD_PROVIDER_2`: Name des zweiten ePA-Providers (z. B. `Bitmarck Technik`)
+3. Tragen Sie die Werte für Umgebung, Konnektor, SMC-B-Kontext und Provider in `config/.env` ein.
 
+Die Konfiguration wird von der aufrufenden Anwendung geladen:
 
-### DiGA-Identifikation
-Folgende Variablen werden zur Erstellung des Author-Strings verwendet:
-- `DIGA_NAME`: Name Ihrer DiGA (Name der Verordnungseinheit)
-- `DIGA_MANUFACTURER`: Name des DiGA-Herstellers
-- `SW_ADDITION_1`: Ergänzung der Bezeichnung der SW 1 (optional)
-- `SW_ADDITION_2`: Ergänzung der Bezeichnung der SW 2 (optional)
-- `SW_ADDITION_3`: Ergänzung der Bezeichnung der SW 3 (optional)
+```python
+from epa_core import bootstrap_environment
 
-Alternativ können Sie auch direkt den kompletten Author-String setzen:
-- `AUTHOR`: Vollständiger Author-String (optional, überschreibt die einzelnen DiGA-Variablen)
-
-### Konnektor-Workspace
-- `MANDANT_ID`: ID des eingerichteten Mandanten im Konnektor
-- `CLIENT_SYSTEM_ID`: ID des eingerichteten Client-Systems im Konnektor
-- `WORKPLACE_ID`: ID des eingerichteten Arbeitsplatzes im Konnektor
-- `USER_ID`: ID des Benutzers (optional)
-
-### Logging
-- `LOG_LEVEL`: Logging-Level (INFO, DEBUG, ERROR, etc.)
-
-
-## Konfiguration
-
-1. Legen Sie das Konnektor-Zertifikat als `.p12`-Datei im Verzeichnis `config/` ab, z. B. als `config/cert.p12`.
-
-2. Legen Sie die Laufzeitkonfiguration in `config/.env` ab. 
-
-
-## Verwendung
-
-Führen Sie den folgenden Befehl aus, um den AuthZ-Workflow zu starten:
-
-```bash
-python -m app.app.client
+bootstrap_environment("/path/to/config")
 ```
 
-Dabei ist `sample_metadata.insurantId` durch eine gültige Versicherten-ID zu ersetzen. 
+Anschließend können die Core-Komponenten importiert werden, zum Beispiel:
 
-### Ablauf
-1. Der AuthZ-Workflow der ePA 3.x wird initiiert.
-2. Nach erfolgreicher Authentifizierung wird eine Test-MIO-Datei aus `app/data/examples/documents/REAL_EXAMPLE_1_KBV_PR_MIO_DIGA_Bundle.xml` in die Akte geschrieben.
+```python
+from epa_core.konnektor.Konnektor import Konnektor
+from epa_core.vau.VAUProtokoll import VAUKanal
+```
+
+Der Standalone-Client kann nach der Konfiguration direkt aus dem Repository gestartet werden:
+
+```bash
+python examples/client.py
+```
+
+## Paket bauen
+
+```bash
+python -m pip install build
+python -m build
+```
+
+## Tests
+
+Der Boundary-Test prüft, dass der Core keine Abhängigkeit auf API, Full, FastAPI oder Redis enthält und dass Search und Retrieve nicht im VAU-Core implementiert sind:
+
+```bash
+python -m pytest -q tests/test_package_boundary.py
+```
 
 ## Fehlerbehandlung
 
 Bei Problemen überprüfen Sie bitte:
-- Liegt die `.p12`-Datei im Verzeichnis `config/`?
-- Ist `config/.env` vorhanden und vollständig befüllt?
-- Ist die Versicherten-ID gültig und die restlichen Metadaten korrekt?
-- Sind alle Abhängigkeiten erfolgreich installiert worden?
-- Ist der SMC-B PIN verifiziert?
+
+- Liegt die `.p12`-Datei im Konfigurationsverzeichnis?
+- Ist die `.env`-Datei vollständig befüllt?
+- Ist das TI-VPN beziehungsweise Split-DNS aktiv?
+- Ist der Konnektor erreichbar?
+- Ist der SMC-B-PIN verifiziert?
 
 # License from fbeta GmbH
 
