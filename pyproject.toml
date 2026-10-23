@@ -18,22 +18,22 @@ classifiers = [
 ]
 dependencies = [
     "asn1crypto==1.5.1",
-    "cbor2>=6.1,<7",
+    "cbor2==6.1.2",
     "coloredlogs==15.0.1",
-    "cryptography>=48.0,<51",
+    "cryptography==50.0.0",
     "ecdsa==0.19.2",
     "jsonschema==4.26.0",
     "jwcrypto==1.5.7",
-    "lxml>=6.1,<7",
+    "lxml==6.1.0",
     "pydantic>=2.8,<3",
     "pyhanko-certvalidator==0.31.1",
     "pyjson5==2.0.0",
     "pymtom_xop==0.0.2",
-    "python-dotenv>=1.2,<2",
-    "requests>=2.33,<3",
+    "python-dotenv==1.2.2",
+    "requests==2.33.1",
     "requests_pkcs12==1.27",
-    "zeep>=4.3,<5",
-    "liboqs-python @ git+https://github.com/open-quantum-safe/liboqs-python.git@9ab93b648e0253087f3c627af3674c058ede391b",
+    "zeep==4.3.3",
+    "liboqs-python @ git+https://github.com/open-quantum-safe/liboqs-python.git@9ab93b648e0253087f3c627af3674c058ede391b#egg=liboqs-python"
 ]
 
 
