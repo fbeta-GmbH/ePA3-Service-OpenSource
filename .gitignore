@@ -1,5 +1,5 @@
 .venv*/
-app/tmp/
+**/tmp/
 # These are some examples of commonly ignored file patterns.
 # You should customize this list as applicable to your project.
 # Learn more about .gitignore:
@@ -469,3 +469,7 @@ FodyWeavers.xsd
 card_data.db
 
 dependencies/
+# Python package build artifacts
+build/
+*.egg-info/
+.pytest_cache/
