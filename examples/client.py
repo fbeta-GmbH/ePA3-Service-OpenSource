@@ -1,4 +1,4 @@
-from epa_core import bootstrap_environment
+from epa_core import bootstrap_environment  # noqa: I001
 
 import json
 from pathlib import Path
@@ -10,7 +10,7 @@ from epa_core.vau import InnerHttpRequest, VAUProtokoll
 from epa_core.konnektor import Konnektor
 from epa_core.idp_handler import identityprovider
 
-import epa_core.utils.utils as utils
+from epa_core.utils import utils
 import epa_core.vau.utils as vau_utils
 from epa_core.xml_service.soap_client import SoapClient
 
