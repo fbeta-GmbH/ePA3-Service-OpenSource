@@ -1,0 +1,12 @@
+{
+    "python.analysis.extraPaths": [
+        "./src/epa_core"
+    ],
+    "ruff.configuration": {
+        "lint": {
+            "ignore": [
+                "I001"
+            ]
+        }
+    }
+}
