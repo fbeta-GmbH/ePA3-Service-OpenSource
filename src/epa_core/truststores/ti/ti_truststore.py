@@ -13,7 +13,6 @@ from urllib.parse import urljoin
 import requests
 import hashlib
 
-# from epa_core.truststores.ti.utils import ROOT_FILE_RE
 from epa_core.truststores.ti.utils import ROOT_FILE_RE, SUB_FILE_RE
 
 from epa_core.runtime_config.epa_env import EpaEnvConfig
@@ -335,9 +334,7 @@ class TI_Truststore:
 
             try:
                 response = requests.get(
-                    as_url,
-                    timeout=self.https_timeout,
-                    verify=ca_bundle_path,
+                    as_url, timeout=self.https_timeout, verify=ca_bundle_path
                 )
                 logger.info(
                     "AS URL %s is reachable with status code %s.",
@@ -346,15 +343,13 @@ class TI_Truststore:
                 )
             except requests.exceptions.SSLError as exc:
                 logger.warning(
-                    "SSL error when connecting to AS URL %s: %s.",
-                    as_url,
-                    exc,
+                    "SSL error when connecting to AS URL %s: %s.", 
+                    as_url, exc
                 )
                 return False
             except requests.RequestException as exc:
                 logger.warning(
-                    "AS URL %s is currently not reachable; "
-                    "this does not invalidate the TI CA bundle: %s",
+                    "AS URL %s is currently not reachable; this does not invalidate the TI CA bundle: %s",
                     as_url,
                     exc,
                 )

@@ -2,7 +2,6 @@ import requests_pkcs12
 import os
 import glob
 import ssl
-import socket
 import urllib3.util.connection
 
 

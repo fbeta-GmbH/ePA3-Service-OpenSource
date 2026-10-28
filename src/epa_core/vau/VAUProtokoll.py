@@ -28,24 +28,24 @@ class VAUKanal:
 
     def __init__(self, AS_URL: str):
         """
-            Initializes the VAUProtokoll instance and establishes a VAU channel with the specified AS_URL.
-            
-            Args:
-                            AS_URL (str): The URL of the authorization server (AS). Must start with "http://" or "https://".
-            
-            Raises:
-                            AssertionError: If AS_URL is not specified or does not start with "http://" or "https://".
-            
-            The initialization process includes the following steps:
-            1. Generates ECDH and Kyber key pairs and sends them in VauMessage 1 to the server.
-            2. Receives the server's response (VauMessage 2) containing the server's public keys and shared secrets,
-            as well as the VAU-CID which is needed for further communication.
-            3. Derives shared secrets and keys (KdfKey1 and KdfKey2) from the received data.
-            4. Sends VauMessage 3 to the server containing the shared secrets and key confirmation from the client.
-            5. Receives the final response from the server (VauMessage 4) to complete the handshake and establish the VAU channel.
-            
-            Note:
-                            The VAU channel is established over HTTPS, but communication within the VAU channel occurs over HTTP.
+        Initializes the VAUProtokoll instance and establishes a VAU channel with the specified AS_URL.
+        
+        Args:
+            AS_URL (str): The URL of the authorization server (AS). Must start with "http://" or "https://".
+        
+        Raises:
+            AssertionError: If AS_URL is not specified or does not start with "http://" or "https://".
+        
+        The initialization process includes the following steps:
+        1. Generates ECDH and Kyber key pairs and sends them in VauMessage 1 to the server.
+        2. Receives the server's response (VauMessage 2) containing the server's public keys and shared secrets,
+        as well as the VAU-CID which is needed for further communication.
+        3. Derives shared secrets and keys (KdfKey1 and KdfKey2) from the received data.
+        4. Sends VauMessage 3 to the server containing the shared secrets and key confirmation from the client.
+        5. Receives the final response from the server (VauMessage 4) to complete the handshake and establish the VAU channel.
+        
+        Note:
+            The VAU channel is established over HTTPS, but communication within the VAU channel occurs over HTTP.
         """
         self.AS_URL = AS_URL.rstrip('/')
         logger.info("=== Initializing VAUKanal with AS_URL: %s ===", self.AS_URL)
@@ -84,7 +84,7 @@ class VAUKanal:
                     AS_URL_START_VAU,
                     headers={
                         "Content-Type": "application/cbor",
-                        "x-useragent": USER_AGENT,
+                        "x-useragent": str(USER_AGENT),
                     },
                     data=nachricht_1_encoded,
                     timeout=HTTPS_TIMEOUT*2,
@@ -103,10 +103,10 @@ class VAUKanal:
             logger.debug("HTTP Response Headers: %s", http_response.headers)
 
             """VauMessage 2:
-                        Der Server nimmt die VauMessage 1 entgegen. Die PublicKeys des Clients und seinen eigenen PrivateKeys nutzt er, 
-                        um die ECDH und Kyber Shared Secrets mitsamt Ciphertexts (KdfMessage) zu erstellen. Daraus erstellt er den ersten 
-                        Schlüssel KdfKey1. Diesen nutzt er, um seine signierten PublicKeys zu verschlüsseln. In VauMessage 2 werden die Ciphertexts 
-                        der Shared Secrets sowie die verschlüsselten signierten PublicKeys gespeichert und diese Nachricht wird zurück zum Client geschickt."""
+                Der Server nimmt die VauMessage 1 entgegen. Die PublicKeys des Clients und seinen eigenen PrivateKeys nutzt er, 
+                um die ECDH und Kyber Shared Secrets mitsamt Ciphertexts (KdfMessage) zu erstellen. Daraus erstellt er den ersten 
+                Schlüssel KdfKey1. Diesen nutzt er, um seine signierten PublicKeys zu verschlüsseln. In VauMessage 2 werden die Ciphertexts 
+                der Shared Secrets sowie die verschlüsselten signierten PublicKeys gespeichert und diese Nachricht wird zurück zum Client geschickt."""
 
             assert http_response.status_code == requests.codes.ok
             assert http_response.headers["Content-Type"] == "application/cbor"
@@ -124,16 +124,16 @@ class VAUKanal:
 
             """Client: nachricht-3 VAUClientKEM+KeyConfirmation
 
-                        VauMessage 3:
-                        Der Client erhält VauMessage 2. Mithilfe der Ciphertexts des Servers und den eigenen PrivateKey 
-                        erstellt er seine eigenen Shared Secrets, mit welchen er den gleichen KdfKey1 wie der Server herleitet. 
-                        Damit entschlüsselt er die signierten PublicKeys des Servers. Mit diesen PublicKeys und den eigenen PrivateKeys 
-                        erstellt der Client weitere Shared Secrets mit zugehörigen Ciphertexts. Mit den Shared Secrets aus beiden 
-                        Vorgängen wird nun ein KdfKey2 generiert, welcher für das Ver-/Entschlüsseln zwischen Client und Server nach dem 
-                        Handshake genutzt wird. Die Ciphertexts für den KdfKey2 werden mit dem KdfKey1 verschlüsselt. Ein Transcript, 
-                        was aus den bisherigen codierten Nachrichten besteht, wird in SHA-256 (=Hash) und dann mit dem KdfKey2 
-                        verschlüsselt (=Ciphertext-KeyConfirmation). Die VauMessage 3 besteht aus den Ciphertexts und der Ciphertext-KeyConfirmation. 
-                        Diese wird zum Server zurückgeschickt."""
+                VauMessage 3:
+                    Der Client erhält VauMessage 2. Mithilfe der Ciphertexts des Servers und den eigenen PrivateKey 
+                    erstellt er seine eigenen Shared Secrets, mit welchen er den gleichen KdfKey1 wie der Server herleitet. 
+                    Damit entschlüsselt er die signierten PublicKeys des Servers. Mit diesen PublicKeys und den eigenen PrivateKeys 
+                    erstellt der Client weitere Shared Secrets mit zugehörigen Ciphertexts. Mit den Shared Secrets aus beiden 
+                    Vorgängen wird nun ein KdfKey2 generiert, welcher für das Ver-/Entschlüsseln zwischen Client und Server nach dem 
+                    Handshake genutzt wird. Die Ciphertexts für den KdfKey2 werden mit dem KdfKey1 verschlüsselt. Ein Transcript, 
+                    was aus den bisherigen codierten Nachrichten besteht, wird in SHA-256 (=Hash) und dann mit dem KdfKey2 
+                    verschlüsselt (=Ciphertext-KeyConfirmation). Die VauMessage 3 besteht aus den Ciphertexts und der Ciphertext-KeyConfirmation. 
+                    Diese wird zum Server zurückgeschickt."""
 
             client_kem_result_1 = kemvau.decapsulation(nachricht_2, client_schluessel_1)
             logger.debug("Schlüsselableitung für die K1-Schlüssel")
@@ -208,14 +208,14 @@ class VAUKanal:
             logger.debug("HTTP Response Headers: %s", http_response.headers)
 
             """VauMessage 4:
-                        Der Server öffnet VauMessage 4 und erhält mit seinem KdfKey1 die Ciphertexts. 
-                        Mit diesen kann er nun seinen eigenen Shared Secrets erstellen. Mit allen Shared Secrets 
-                        leitet er, wie der Client zuvor, den KdfKey2 her. Um den Vorgang zu validieren, überprüft 
-                        der Server die Hash des Clients: Er entschlüsselt die Ciphertext-KeyConfirmation mit dem KdfKey2 
-                        und erhält den Client-Hash. Diese vergleicht er mit dem SHA-256 verschlüsselten eigenen Transcript. 
-                        Den eigenen Hash verschlüsselt er mit dem KdfKey2 (=Ciphertext-KeyConfirmation). 
-                        Diese wird in VauMessage 4 gespeichert und zurück zum Client geschickt.
-                        """
+                Der Server öffnet VauMessage 4 und erhält mit seinem KdfKey1 die Ciphertexts. 
+                Mit diesen kann er nun seinen eigenen Shared Secrets erstellen. Mit allen Shared Secrets 
+                leitet er, wie der Client zuvor, den KdfKey2 her. Um den Vorgang zu validieren, überprüft 
+                der Server die Hash des Clients: Er entschlüsselt die Ciphertext-KeyConfirmation mit dem KdfKey2 
+                und erhält den Client-Hash. Diese vergleicht er mit dem SHA-256 verschlüsselten eigenen Transcript. 
+                Den eigenen Hash verschlüsselt er mit dem KdfKey2 (=Ciphertext-KeyConfirmation). 
+                Diese wird in VauMessage 4 gespeichert und zurück zum Client geschickt.
+                """
             logger.debug(http_response.status_code)
             # ic(http_response.content)
             logger.info("Status code: %s", http_response.status_code)
@@ -241,14 +241,14 @@ class VAUKanal:
     def parse_inner_http_response(self, response: bytes) -> dict:
         logger.debug("Parsing inner HTTP response")
         """
-                Parses an HTTP response in bytes and formats it into its components.
-                
-                Args:
-                        response (bytes): The HTTP response in bytes.
-                
-                Returns:
-                        dict: A dictionary containing 'http_status', 'headers', and 'body'.
-                """
+        Parses an HTTP response in bytes and formats it into its components.
+        
+        Args:
+            response (bytes): The HTTP response in bytes.
+        
+        Returns:
+            dict: A dictionary containing 'http_status', 'headers', and 'body'.
+        """
         # 1. Header und Body trennen
         header_bytes, body_bytes = response.split(b"\r\n\r\n", 1)
 
@@ -286,18 +286,18 @@ class VAUKanal:
     def send_vau_message(self, inner_request: bytes, vau_np=None) -> bytes:
         logger.info("Sending VAU message")
         """
-                Sends an inner HTTP request through the VAU channel and processes the response.
+        Sends an inner HTTP request through the VAU channel and processes the response.
 
-                Args:
-                        inner_request (bytes): The inner HTTP request to be sent as a byte array.
-                        vau_np (str, optional): The VAU-NP header value if available. Defaults to None.
-                
-                Raises:
-                        ValueError: If the response is too short, contains invalid header fields, or decryption fails.
-                
-                Returns:
-                        bytes: The decrypted response as a byte array.
-                """
+        Args:
+            inner_request (bytes): The inner HTTP request to be sent as a byte array.
+            vau_np (str, optional): The VAU-NP header value if available. Defaults to None.
+        
+        Raises:
+            ValueError: If the response is too short, contains invalid header fields, or decryption fails.
+        
+        Returns:
+            bytes: The decrypted response as a byte array.
+        """
         http_response = None
         try:
             self.encryption_counter += 1
@@ -387,6 +387,7 @@ class VAUKanal:
             resp_counter = int.from_bytes(response_data[3:11], "big")
             resp_keyid = response_data[11:43]
 
+            # Verify header fields
             if resp_pu != 0x00:
                 raise VAUException(
                     message="Invalid PU/nonPU byte in VAU response",
@@ -479,7 +480,16 @@ class VAUKanal:
 
 
     def execute(self, request: InnerHttpRequest, *, vau_np: str | None = None) -> InnerHttpResponse:
-        """Send an arbitrary inner HTTP request over the established VAU channel."""
+        """
+        Send an arbitrary inner HTTP request over the established VAU channel.
+
+        Args:
+            request: The inner HTTP request to be sent.
+            vau_np: Optional VAU nonce parameter.
+
+        Returns:
+            The inner HTTP response received over the VAU channel.
+        """
         body = request.body or b""
         normalized_headers = {str(k).lower(): str(v) for k, v in request.headers.items()}
         accept = normalized_headers.pop("accept", None)
@@ -582,7 +592,7 @@ class VAUKanal:
             logger.debug(json.dumps(parsed_decrypted_resp, indent=4))
             
             utils.check_upload_response_for_errors(parsed_decrypted_resp)
-            
+        
             location_uri_parameters: dict = {
                 k: v[0]
                 for k, v in dict(parse.parse_qs(parse.urlsplit(parsed_decrypted_resp["headers"]["Location"]).query)).items()
@@ -602,7 +612,7 @@ class VAUKanal:
                 new_uri,
                 headers={
                     "Content-Type": "application/octet-stream",
-                    "x-useragent": USER_AGENT,
+                    "x-useragent": str(USER_AGENT),
                 },
                 timeout=HTTPS_TIMEOUT,
             )

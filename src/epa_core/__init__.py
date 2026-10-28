@@ -1,8 +1,6 @@
 """Shared ePA protocol implementation.
 
-Importing :mod:`epa_core` itself performs no network access and does not load a .env file.
-Applications should call :func:`bootstrap_environment` before importing runtime modules that
-consume environment configuration.
+Applications should call :func:`bootstrap_environment` before importing runtime modules that consume environment configuration.
 """
 from pathlib import Path
 import os

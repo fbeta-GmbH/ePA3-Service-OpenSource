@@ -37,7 +37,6 @@ from pyhanko_certvalidator.policy_decl import (
     RevocationCheckingRule,
 )
 
-# from epa_core.constants import HTTPS_TIMEOUT, TI_PKI_ROOTS_DIR, USER_AGENT
 from epa_core.runtime_config.constants import HTTPS_TIMEOUT, TI_PKI_ROOTS_DIR, USER_AGENT, TI_CA_BUNDLE
 from epa_core.exceptions import ErrorCodes, VAUException
 from epa_core.runtime_config.logging import logger

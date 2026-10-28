@@ -15,6 +15,7 @@ for key, value in os.environ.items():
         provider_id = key.split("_")[-1]  # Extract the number from the variable name
         RECORD_PROVIDER_MAPPING[provider_name] = int(provider_id)
 
+
 # DiGA professionOID - all other OIDs are treated as LE (Leistungserbringer)
 # See: gemSpec_OID Tab_PKI_403 (oid_diga = DiGA-Hersteller und -Anbieter)
 #   https://gemspec.gematik.de/docs/gemSpec/gemSpec_OID/latest/#polarion___2
@@ -220,6 +221,7 @@ KONNEKTOR_TLS_MODE = os.getenv("KONNEKTOR_TLS_MODE", KonnektorTlsMode.SMC_K.valu
 if KONNEKTOR_TLS_MODE not in [mode.value for mode in KonnektorTlsMode]:
     raise ValueError(f"Invalid KONNEKTOR_TLS_MODE: {KONNEKTOR_TLS_MODE}. Must be one of {[mode.value for mode in KonnektorTlsMode]}.")
 
+
 KONNEKTOR_URL = os.getenv('KONNEKTOR_URL', '')
 KONNEKTOR_IP = KONNEKTOR_URL.split("//")[-1].split("/")[0].split(":")[0]  # Extract hostname or IP from URL
 KONNEKTOR_TLS_HOSTNAME = None  # Default: use IP for both connection and TLS verification
@@ -248,6 +250,7 @@ match KONNEKTOR_TLS_MODE:
             "Konnektor identity verification is EXPLICITLY DISABLED via KONNEKTOR_TLS_MODE=insecure. The service cannot confirm it is talking to the real Konnektor. "
             "This is insecure and NOT recommended for production use."
         )
+
 
 TI_PKI_ROOTS_DIR = ti_ts.get_root_ca_path()
 
