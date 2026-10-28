@@ -23,7 +23,7 @@ def _init_and_authenticate(insurant_id: str):
         """Initialize Konnektor, IDP and VAU session, authenticate and return (vau_con, vau_np)."""
         Config.logger.info("Starting ePA-Client")
 
-        AS_URL = Config.DEFAULT_AS_URL
+        AS_URL = Config.epa.default_as_url
 
         Config.logger.info("Creating new session")
         vau_con = VAUProtokoll.VAUKanal(AS_URL)
@@ -91,7 +91,7 @@ def _init_and_authenticate(insurant_id: str):
 
 
 def send_document_to_epa(metadata: dict, document_file_name: str):
-        document_file_location = str(Config.DATA_DIR / 'examples' / 'documents' / document_file_name)
+        document_file_location = str(Config.paths.data_dir / 'examples' / 'documents' / document_file_name)
 
         vau_con, vau_np, AS_URL = _init_and_authenticate(metadata['insurantId'])
 

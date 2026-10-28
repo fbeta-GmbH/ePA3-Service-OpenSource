@@ -34,18 +34,18 @@ class Konnektor:
         """
         Config.logger.info("Initializing Konnektor with p12 certificate: %s", path_to_p12)
         self.path_to_p12 = path_to_p12
-        self.cert_password = Config.KONNEKTOR_CERT_PW
+        self.cert_password = Config.konnektor.cert_password
 
         self.session = Session()
 
-        ca_bundle = Config.KONNEKTOR_CA_BUNDLE if isinstance(Config.KONNEKTOR_CA_BUNDLE, str) else None
+        ca_bundle = Config.konnektor.ca_bundle if isinstance(Config.konnektor.ca_bundle, str) else None
                 
         pkcs12_adapter = PinnedPkcs12Adapter(
             pkcs12_filename=self.path_to_p12,
             pkcs12_password=self.cert_password,
             ca_bundle=ca_bundle,
-            tls_hostname=Config.KONNEKTOR_TLS_HOSTNAME,
-            target_ip=Config.KONNEKTOR_IP,
+            tls_hostname=Config.konnektor.tls_hostname,
+            target_ip=Config.konnektor.connection_host,
         )
 
         self.session.mount("https://", pkcs12_adapter)
@@ -53,8 +53,8 @@ class Konnektor:
         self.session.headers.update({
             'Content-Type': 'application/xml',
         })
-        if Config.KONNEKTOR_CA_BUNDLE:
-            self.session.verify = Config.KONNEKTOR_CA_BUNDLE
+        if Config.konnektor.ca_bundle:
+            self.session.verify = Config.konnektor.ca_bundle
         else:
             self.session.verify = False  # Disable certificate verification if no CA bundle is provided
             Config.logger.error(
@@ -94,8 +94,8 @@ class Konnektor:
         """
         try:
             response = self.session.get(
-                f'{Config.KONNEKTOR_URL}/connector.sds',
-                timeout=Config.HTTPS_TIMEOUT
+                f'{Config.konnektor.url}/connector.sds',
+                timeout=Config.network.https_timeout
             )
             if response.status_code == status.HTTP_200_OK:
                 Config.logger.info("Konnektor connection test successful")
@@ -190,17 +190,17 @@ class Konnektor:
                 SoapClient.Services.EventService.EventServicePort.GetCards, 
                 params={
                     "Context": {
-                        "MandantId": Config.MANDANT_ID,
-                        "ClientSystemId": Config.CLIENT_SYSTEM_ID,
-                        "WorkplaceId": Config.WORKPLACE_ID,
+                        "MandantId": Config.konnektor.mandant_id,
+                        "ClientSystemId": Config.konnektor.client_system_id,
+                        "WorkplaceId": Config.konnektor.workplace_id,
                     }
                 }
             )
 
             response = self.session.post(
-                f'{Config.KONNEKTOR_URL}/webservices/eventservice',
+                f'{Config.konnektor.url}/webservices/eventservice',
                 data=soap_request,
-                timeout=Config.HTTPS_TIMEOUT
+                timeout=Config.network.https_timeout
             )
 
             # Evaluate the response using zeep
@@ -261,9 +261,9 @@ class Konnektor:
                 params={
                     "CardHandle": card_handle,
                     "Context": {
-                        "MandantId": Config.MANDANT_ID,
-                        "ClientSystemId": Config.CLIENT_SYSTEM_ID,
-                        "WorkplaceId": Config.WORKPLACE_ID,
+                        "MandantId": Config.konnektor.mandant_id,
+                        "ClientSystemId": Config.konnektor.client_system_id,
+                        "WorkplaceId": Config.konnektor.workplace_id,
                     },
                     "CertRefList": ["C.AUT"],
                     "Crypt": "ECC"
@@ -271,9 +271,9 @@ class Konnektor:
             )
 
             response = self.session.post(
-                f'{Config.KONNEKTOR_URL}/webservices/certificateservice',
+                f'{Config.konnektor.url}/webservices/certificateservice',
                 data=soap_request,
-                timeout=Config.HTTPS_TIMEOUT
+                timeout=Config.network.https_timeout
             )
 
             # Evaluate the response using zeep
@@ -327,18 +327,18 @@ class Konnektor:
                 params={
                     "CardHandle": card_handle,
                     "Context": {
-                        "MandantId": Config.MANDANT_ID,
-                        "ClientSystemId": Config.CLIENT_SYSTEM_ID,
-                        "WorkplaceId": Config.WORKPLACE_ID,
+                        "MandantId": Config.konnektor.mandant_id,
+                        "ClientSystemId": Config.konnektor.client_system_id,
+                        "WorkplaceId": Config.konnektor.workplace_id,
                     },
                     "PinTyp": "PIN.SMC", 
                 }
             )
             
             response = self.session.post(
-                f'{Config.KONNEKTOR_URL}/webservices/cardservice',
+                f'{Config.konnektor.url}/webservices/cardservice',
                 data=soap_request,
-                timeout=Config.HTTPS_TIMEOUT
+                timeout=Config.network.https_timeout
             )
 
             parsed_response = SoapClient.parse_xml_response(
@@ -497,9 +497,9 @@ class Konnektor:
                 params={
                     "CardHandle": card_handle,
                     "Context": {
-                        "MandantId": Config.MANDANT_ID,
-                        "ClientSystemId": Config.CLIENT_SYSTEM_ID,
-                        "WorkplaceId": Config.WORKPLACE_ID,
+                        "MandantId": Config.konnektor.mandant_id,
+                        "ClientSystemId": Config.konnektor.client_system_id,
+                        "WorkplaceId": Config.konnektor.workplace_id,
                     },
                     "OptionalInputs": {
                         "SignatureType": signature_type,
@@ -515,12 +515,12 @@ class Konnektor:
             )
 
             response = self.session.post(
-                f'{Config.KONNEKTOR_URL}/webservices/authsignatureservice',
+                f'{Config.konnektor.url}/webservices/authsignatureservice',
                 data=soap_request,
                 headers={
                     'SOAPAction': '"http://ws.gematik.de/conn/SignatureService/v7.4#ExternalAuthenticate"'
                 },
-                timeout=Config.HTTPS_TIMEOUT,
+                timeout=Config.network.https_timeout,
                 allow_redirects=False
             )
 

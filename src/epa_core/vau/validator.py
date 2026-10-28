@@ -53,7 +53,7 @@ from epa_core.vau.vau_models import (
 # - extract CA certs
 # - use them as trust anchors without age filter. 
 
-def _load_ti_trust_roots() -> list[asn1_x509.Certificate]:
+def _load_ti_trust_roots(root_dir: str | None = None, logger: logging.Logger | None = None) -> list[asn1_x509.Certificate]:
     """
     Load locally configured TI root certificates (trust anchors).
     Only chains ending in one of these roots are accepted as valid during certificate path validation.
@@ -67,9 +67,12 @@ def _load_ti_trust_roots() -> list[asn1_x509.Certificate]:
     Raises:
         VAUException: If the root certificate directory is missing, or if no usable root certificates were found.
     """
-    if not os.path.isdir(Config.TI_PKI_ROOTS_DIR):
+    effective_root_dir = root_dir if root_dir is not None else Config.truststore.ti_pki_roots_dir
+    effective_logger = logger if logger is not None else Config.logger
+
+    if not os.path.isdir(effective_root_dir):
         raise VAUException(
-            message=f"TI PKI root certificate directory does not exist: {Config.TI_PKI_ROOTS_DIR}",
+            message=f"TI PKI root certificate directory does not exist: {effective_root_dir}",
             error_code=ErrorCodes.VAU_INIT_FAILED,
             status_code=500,
         )
@@ -80,11 +83,11 @@ def _load_ti_trust_roots() -> list[asn1_x509.Certificate]:
 
     # Collect all usable root certs from the configured directory.
     ti_trust_roots: list[asn1_x509.Certificate] = []
-    for root_cert_filename in sorted(os.listdir(Config.TI_PKI_ROOTS_DIR)):
+    for root_cert_filename in sorted(os.listdir(effective_root_dir)):
         # Only DER certificate files are considered.
         if not root_cert_filename.endswith(".der"):
             continue
-        root_cert_path = os.path.join(Config.TI_PKI_ROOTS_DIR, root_cert_filename)
+        root_cert_path = os.path.join(effective_root_dir, root_cert_filename)
         try:
             with open(root_cert_path, "rb") as f:
                 root_cert_der = f.read()
@@ -94,24 +97,24 @@ def _load_ti_trust_roots() -> list[asn1_x509.Certificate]:
             # A_24958: skip roots whose notBefore is less than 2 years ago.
             cert_age = now - cert.not_valid_before_utc
             if cert_age < min_age:
-                Config.logger.debug(f"Skipping TI root {root_cert_filename}: not yet 2 years old (notBefore={cert.not_valid_before_utc.isoformat()}, age={cert_age.days} days)")
+                effective_logger.debug(f"Skipping TI root {root_cert_filename}: not yet 2 years old (notBefore={cert.not_valid_before_utc.isoformat()}, age={cert_age.days} days)")
                 continue
 
             # Convert to asn1crypto type expected by pyHanko.
             ti_trust_roots.append(asn1_x509.Certificate.load(root_cert_der))
         except Exception as e:
-            Config.logger.error(f"Failed to load TI PKI trust root {root_cert_path}: {str(e)}")
+            effective_logger.error(f"Failed to load TI PKI trust root {root_cert_path}: {str(e)}")
 
     if not ti_trust_roots:
         raise VAUException(
-            message=f"No valid TI PKI trust roots loaded from {Config.TI_PKI_ROOTS_DIR}",
+            message=f"No valid TI PKI trust roots loaded from {effective_root_dir}",
             error_code=ErrorCodes.VAU_INIT_FAILED,
             status_code=500,
         )
 
     loaded_filenames = [cert.subject.native.get("common_name", "?") for cert in ti_trust_roots]
-    Config.logger.debug(f"Loaded {len(ti_trust_roots)} TI PKI trust root(s) ({os.path.basename(Config.TI_PKI_ROOTS_DIR)}): {loaded_filenames}")
-    Config.logger.debug(f"TI PKI trust root details: {ti_trust_roots[0].subject.human_friendly}")
+    effective_logger.debug(f"Loaded {len(ti_trust_roots)} TI PKI trust root(s) ({os.path.basename(effective_root_dir)}): {loaded_filenames}")
+    effective_logger.debug(f"TI PKI trust root details: {ti_trust_roots[0].subject.human_friendly}")
 
     return ti_trust_roots
 
@@ -150,7 +153,7 @@ class VAUCertificateValidator:
     def __init__(self, AS_URL: str, https_session):
         self.AS_URL = AS_URL
         self.https_session = https_session
-        self.ti_trust_roots = Config.TI_TRUST_ROOTS
+        self.ti_trust_roots = Config.truststore.ti_trust_roots
 
     def fetch_cert_data(self, cert_hash: bytes, cdv: int) -> AUT_VAU_CertData:
         """
@@ -182,9 +185,9 @@ class VAUCertificateValidator:
         # Request CertData
         cert_data_response = self.https_session.get(
             cert_endpoint,
-            verify=Config.TI_CA_BUNDLE,
-            headers={"x-useragent": Config.USER_AGENT},
-            timeout=Config.HTTPS_TIMEOUT
+            verify=Config.truststore.ti_ca_bundle,
+            headers={"x-useragent": Config.network.user_agent},
+            timeout=Config.network.https_timeout
         )
 
         Config.logger.info(f"Requested CertData from {cert_endpoint}, status code: {cert_data_response.status_code}")

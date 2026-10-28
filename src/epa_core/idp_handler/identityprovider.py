@@ -19,7 +19,8 @@ class IdentityProvider:
         Initialize a new instance of the IdentityProvider class.
         Uses the IDP_URL constant for API endpoint configuration.
         """
-        Config.logger.info("Initializing IdentityProvider with URL: %s", Config.IDP_URL)
+        Config.assert_initialized()
+        Config.logger.info("Initializing IdentityProvider with URL: %s", Config.epa.idp_url)
         self.puk_idp_enc_url, self.puk_idp_sig_url = self.get_discovery()
 
     def get_certs(self) -> dict[str, Any]:
@@ -34,7 +35,7 @@ class IdentityProvider:
         """
         try:
             Config.logger.info("Getting certificates")
-            response = requests.get(Config.IDP_URL + '/certs', timeout=Config.HTTPS_TIMEOUT)
+            response = requests.get(Config.epa.idp_url + '/certs', timeout=Config.network.https_timeout)
             Config.logger.debug("Certificates: %s", json.dumps(response.json(), indent=4))
             return response.json()
         except (requests.exceptions.SSLError, SSLCertVerificationError):
@@ -56,7 +57,7 @@ class IdentityProvider:
             requests.exceptions.RequestException: If the configuration cannot be retrieved
         """
         Config.logger.info("Getting OpenID configuration")
-        response = requests.get(Config.IDP_URL + '/.well-known/openid-configuration', timeout=Config.HTTPS_TIMEOUT)
+        response = requests.get(Config.epa.idp_url + '/.well-known/openid-configuration', timeout=Config.network.https_timeout)
         Config.logger.debug("OpenID configuration: %s", json.dumps(dict(response.headers), indent=4))
         return dict(response.headers)
     
@@ -75,7 +76,7 @@ class IdentityProvider:
             requests.exceptions.RequestException: If the key cannot be retrieved
         """
         Config.logger.info("Getting PUK IDP SIG")
-        response = requests.get(self.puk_idp_sig_url, timeout=Config.HTTPS_TIMEOUT)
+        response = requests.get(self.puk_idp_sig_url, timeout=Config.network.https_timeout)
         Config.logger.debug("PUK IDP SIG: %s", json.dumps(response.json(), indent=4))
         return response.text
     
@@ -95,7 +96,7 @@ class IdentityProvider:
             requests.exceptions.RequestException: If the key cannot be retrieved
         """
         Config.logger.info("Getting PUK IDP ENC")
-        response = requests.get(self.puk_idp_enc_url, timeout=Config.HTTPS_TIMEOUT)
+        response = requests.get(self.puk_idp_enc_url, timeout=Config.network.https_timeout)
         Config.logger.debug("PUK IDP ENC: %s", json.dumps(response.json(), indent=4))
         return response.text
 
@@ -114,7 +115,7 @@ class IdentityProvider:
             requests.exceptions.RequestException: If the key cannot be retrieved
         """
         Config.logger.info("Getting PUK IDP SEK")
-        response = requests.get(Config.IDP_URL + '/certs/puk_idp_sek', timeout=Config.HTTPS_TIMEOUT)
+        response = requests.get(Config.epa.idp_url + '/certs/puk_idp_sek', timeout=Config.network.https_timeout)
         Config.logger.debug("PUK IDP SEK: %s", json.dumps(response.json(), indent=4))
         return response.text
     
@@ -131,7 +132,7 @@ class IdentityProvider:
         Config.logger.info("Getting discovery configuration")
         try:
             Config.logger.info("Requesting discovery configuration from IDP")
-            response = requests.get(Config.IDP_URL + '/.well-known/openid-configuration', timeout=Config.HTTPS_TIMEOUT)
+            response = requests.get(Config.epa.idp_url + '/.well-known/openid-configuration', timeout=Config.network.https_timeout)
             response.raise_for_status()
 
             try:
@@ -297,8 +298,8 @@ class IdentityProvider:
             'signed_challenge': encrypted_njwt
         }
 
-        response = requests.post(Config.IDP_URL + Config.IDP_AUTH_PATH, data=data, timeout=Config.HTTPS_TIMEOUT, allow_redirects=False, headers={
-            "x-useragent": Config.USER_AGENT,
+        response = requests.post(Config.epa.idp_url + Config.epa.idp_auth_path, data=data, timeout=Config.network.https_timeout, allow_redirects=False, headers={
+            "x-useragent": Config.network.user_agent,
         })
         Config.logger.debug("Auth NJWT response: %s", response.headers)
         Config.logger.debug("Auth NJWT response body: %s", response.text)

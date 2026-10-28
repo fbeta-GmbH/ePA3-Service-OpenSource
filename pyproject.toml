@@ -33,6 +33,7 @@ dependencies = [
     "requests==2.34.2",
     "requests_pkcs12==1.27",
     "zeep==4.3.3",
+    "pydantic_settings==2.16.2",
     "liboqs-python @ git+https://github.com/open-quantum-safe/liboqs-python.git@9ab93b648e0253087f3c627af3674c058ede391b#egg=liboqs-python"
 ]
 

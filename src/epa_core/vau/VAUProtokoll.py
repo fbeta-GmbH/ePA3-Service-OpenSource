@@ -62,7 +62,7 @@ class VAUKanal:
             self.host = parse.urlparse(self.AS_URL).netloc
 
             self.https_session = requests.Session()
-            self.https_session.verify = Config.TI_CA_BUNDLE
+            self.https_session.verify = Config.truststore.ti_ca_bundle
             self.vau_cert_validator = validator.VAUCertificateValidator(AS_URL=self.AS_URL, https_session=self.https_session)
 
             # VauMessage 1:
@@ -83,10 +83,10 @@ class VAUKanal:
                     AS_URL_START_VAU,
                     headers={
                         "Content-Type": "application/cbor",
-                        "x-useragent": Config.USER_AGENT,
+                        "x-useragent": Config.network.user_agent,
                     },
                     data=nachricht_1_encoded,
-                    timeout=Config.HTTPS_TIMEOUT*2,
+                    timeout=Config.network.https_timeout*2,
                 )
             except (requests.exceptions.SSLError, SSLCertVerificationError):
                 raise
@@ -189,10 +189,10 @@ class VAUKanal:
                     self.as_url_plus_vau_cid,
                     headers={
                         "Content-Type": "application/cbor",
-                        "x-useragent": Config.USER_AGENT,
+                        "x-useragent": Config.network.user_agent,
                     },
                     data=nachricht_3_encoded,
-                    timeout=Config.HTTPS_TIMEOUT,
+                    timeout=Config.network.https_timeout,
                 )
             except (requests.exceptions.SSLError, SSLCertVerificationError):
                 raise
@@ -323,11 +323,11 @@ class VAUKanal:
             # Send request
             headers = {
                 "Content-Type": "application/octet-stream",
-                "x-useragent": Config.USER_AGENT,
+                "x-useragent": Config.network.user_agent,
             }
 
             # If not PU, then add VAU-nonPU-Tracing in Header
-            if Config.EPA_ENVIRONMENT != EpaEnvs.PROD.id:
+            if Config.epa.environment != EpaEnvs.PROD.id:
                 k2_c2s_b64 = b64encode(self.c_k2_c2s_app_data).decode('ascii')
                 k2_s2c_b64 = b64encode(self.c_k2_s2c_app_data).decode('ascii')
                 headers["VAU-nonPU-Tracing"] = f"{k2_c2s_b64} {k2_s2c_b64}"
@@ -343,7 +343,7 @@ class VAUKanal:
                 self.as_url_plus_vau_cid,
                 headers=headers,
                 data=message,
-                timeout=Config.HTTPS_TIMEOUT,
+                timeout=Config.network.https_timeout,
             )
 
             # Get response data
@@ -463,7 +463,7 @@ class VAUKanal:
                 (f"Accept: {utils.sanitize_header_value(accept_type)}\r\n" if accept_type is not None else "") +
                 (f"Content-Type: {utils.sanitize_header_value(content_type)}\r\n" if content_type is not None else "") +
                 (f"Content-Length: {utils.sanitize_header_value(str(content_length))}\r\n" if content_length is not None else "") +
-                f"x-useragent: {utils.sanitize_header_value(Config.USER_AGENT)}\r\n"
+                f"x-useragent: {utils.sanitize_header_value(Config.network.user_agent)}\r\n"
                 f"x-insurantid: {utils.sanitize_header_value(utils.validate_insurant_id(insurant_id))}\r\n"
                 "\r\n"
             )
@@ -601,9 +601,9 @@ class VAUKanal:
                 new_uri,
                 headers={
                     "Content-Type": "application/octet-stream",
-                    "x-useragent": Config.USER_AGENT,
+                    "x-useragent": Config.network.user_agent,
                 },
-                timeout=Config.HTTPS_TIMEOUT,
+                timeout=Config.network.https_timeout,
             )
 
             Config.logger.debug("HTTP Content: %s", http_response.content)
@@ -725,6 +725,6 @@ class VAUKanal:
         instance.host = data["host"]
 
         instance.https_session = requests.Session()
-        instance.https_session.verify = Config.TI_CA_BUNDLE
+        instance.https_session.verify = Config.truststore.ti_ca_bundle
 
         return instance
