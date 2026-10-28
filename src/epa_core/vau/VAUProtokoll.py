@@ -18,8 +18,7 @@ import requests
 from epa_core.http_status import status
 
 from epa_core.exceptions import AuthenticationException, AuthorizationException, ErrorCodes, VAUException
-from epa_core.runtime_config.logging import logger
-from epa_core.runtime_config.constants import EPA_ENVIRONMENT, HTTPS_TIMEOUT, TI_CA_BUNDLE, USER_AGENT, EpaEnvs
+from epa_core.runtime_config.constants import Config, EpaEnvs
 from epa_core.vau import kemvau, utils, validator
 from epa_core.vau.http import InnerHttpRequest, InnerHttpResponse
 
@@ -48,7 +47,7 @@ class VAUKanal:
                             The VAU channel is established over HTTPS, but communication within the VAU channel occurs over HTTP.
         """
         self.AS_URL = AS_URL.rstrip('/')
-        logger.info("=== Initializing VAUKanal with AS_URL: %s ===", self.AS_URL)
+        Config.logger.info("=== Initializing VAUKanal with AS_URL: %s ===", self.AS_URL)
         try:
 
             self.encryption_counter = 0
@@ -63,7 +62,7 @@ class VAUKanal:
             self.host = parse.urlparse(self.AS_URL).netloc
 
             self.https_session = requests.Session()
-            self.https_session.verify = TI_CA_BUNDLE
+            self.https_session.verify = Config.TI_CA_BUNDLE
             self.vau_cert_validator = validator.VAUCertificateValidator(AS_URL=self.AS_URL, https_session=self.https_session)
 
             # VauMessage 1:
@@ -84,10 +83,10 @@ class VAUKanal:
                     AS_URL_START_VAU,
                     headers={
                         "Content-Type": "application/cbor",
-                        "x-useragent": USER_AGENT,
+                        "x-useragent": Config.USER_AGENT,
                     },
                     data=nachricht_1_encoded,
-                    timeout=HTTPS_TIMEOUT*2,
+                    timeout=Config.HTTPS_TIMEOUT*2,
                 )
             except (requests.exceptions.SSLError, SSLCertVerificationError):
                 raise
@@ -98,9 +97,9 @@ class VAUKanal:
                     status_code=status.HTTP_401_UNAUTHORIZED
                 )
 
-            logger.debug("VauMessage 1 sent, response: %s", http_response.content)
-            logger.debug("HTTP Status Code: %s", http_response.status_code)
-            logger.debug("HTTP Response Headers: %s", http_response.headers)
+            Config.logger.debug("VauMessage 1 sent, response: %s", http_response.content)
+            Config.logger.debug("HTTP Status Code: %s", http_response.status_code)
+            Config.logger.debug("HTTP Response Headers: %s", http_response.headers)
 
             """VauMessage 2:
                         Der Server nimmt die VauMessage 1 entgegen. Die PublicKeys des Clients und seinen eigenen PrivateKeys nutzt er, 
@@ -136,7 +135,7 @@ class VAUKanal:
                         Diese wird zum Server zurückgeschickt."""
 
             client_kem_result_1 = kemvau.decapsulation(nachricht_2, client_schluessel_1)
-            logger.debug("Schlüsselableitung für die K1-Schlüssel")
+            Config.logger.debug("Schlüsselableitung für die K1-Schlüssel")
             (c_k1_c2s, c_k1_s2c) = kemvau.kem_kdf(client_kem_result_1)
             transfered_signed_vau_server_pub_keys = kemvau.aead_dec(
                 c_k1_s2c, nachricht_2["AEAD_ct"]
@@ -144,7 +143,7 @@ class VAUKanal:
             # Im Produktivcode try-Umgebung, weil daten noch nicht authentisiert
             signed_vau_server_pub_keys = cbor2.loads(transfered_signed_vau_server_pub_keys)
 
-            logger.debug(signed_vau_server_pub_keys)
+            Config.logger.debug(signed_vau_server_pub_keys)
 
             # Enforce A_24624-01 certificate validation here; violations raise VAUException directly.
             self.vau_cert_validator.validate(signed_vau_server_pub_keys)
@@ -163,7 +162,7 @@ class VAUKanal:
             aead_ciphertext_msg_3 = kemvau.aead_enc(c_k1_c2s, nachricht_3_inner_layer_encoded)
             transscript_client_to_send = transscript_client + aead_ciphertext_msg_3
 
-            logger.debug("Schlüsselableitung für die K2-Schlüssel")
+            Config.logger.debug("Schlüsselableitung für die K2-Schlüssel")
             (
                 c_k2_c2s_key_confirmation,
                 self.c_k2_c2s_app_data,
@@ -190,10 +189,10 @@ class VAUKanal:
                     self.as_url_plus_vau_cid,
                     headers={
                         "Content-Type": "application/cbor",
-                        "x-useragent": USER_AGENT,
+                        "x-useragent": Config.USER_AGENT,
                     },
                     data=nachricht_3_encoded,
-                    timeout=HTTPS_TIMEOUT,
+                    timeout=Config.HTTPS_TIMEOUT,
                 )
             except (requests.exceptions.SSLError, SSLCertVerificationError):
                 raise
@@ -204,8 +203,8 @@ class VAUKanal:
                     status_code=status.HTTP_502_BAD_GATEWAY
                 )
 
-            logger.debug("VauMessage 3 sent, response: %s", http_response.content)
-            logger.debug("HTTP Response Headers: %s", http_response.headers)
+            Config.logger.debug("VauMessage 3 sent, response: %s", http_response.content)
+            Config.logger.debug("HTTP Response Headers: %s", http_response.headers)
 
             """VauMessage 4:
                         Der Server öffnet VauMessage 4 und erhält mit seinem KdfKey1 die Ciphertexts. 
@@ -216,21 +215,21 @@ class VAUKanal:
                         Den eigenen Hash verschlüsselt er mit dem KdfKey2 (=Ciphertext-KeyConfirmation). 
                         Diese wird in VauMessage 4 gespeichert und zurück zum Client geschickt.
                         """
-            logger.debug(http_response.status_code)
+            Config.logger.debug(http_response.status_code)
             # ic(http_response.content)
-            logger.info("Status code: %s", http_response.status_code)
+            Config.logger.info("Status code: %s", http_response.status_code)
             assert http_response.status_code == requests.codes.ok
             assert http_response.headers["Content-Type"] == "application/cbor"
 
             nachricht_4_encoded = http_response.content
 
-            logger.info("----------------------VAU-KANAL ERFOLGREICH AUFGEBAUT----------------------") 
+            Config.logger.info("----------------------VAU-KANAL ERFOLGREICH AUFGEBAUT----------------------") 
         except (requests.exceptions.SSLError, SSLCertVerificationError):
             raise
         except VAUException:
             raise
         except Exception as e:
-            logger.exception("Unexpected error during building of VAU-Kanal (%s)", type(e).__name__)
+            Config.logger.exception("Unexpected error during building of VAU-Kanal (%s)", type(e).__name__)
             raise VAUException(
                 message=f"Building VAU-Kanal Failed: {str(e)}",
                 error_code=ErrorCodes.VAU_AUTH_FAILED,
@@ -239,7 +238,7 @@ class VAUKanal:
 
 
     def parse_inner_http_response(self, response: bytes) -> dict:
-        logger.debug("Parsing inner HTTP response")
+        Config.logger.debug("Parsing inner HTTP response")
         """
                 Parses an HTTP response in bytes and formats it into its components.
                 
@@ -280,11 +279,11 @@ class VAUKanal:
             )
 
         result = {"http_status": http_status, "headers": header_dict, "body": body_json}
-        logger.debug("Parsed response: %s", json.dumps(result, indent=4, default=str))
+        Config.logger.debug("Parsed response: %s", json.dumps(result, indent=4, default=str))
         return result
 
     def send_vau_message(self, inner_request: bytes, vau_np=None) -> bytes:
-        logger.info("Sending VAU message")
+        Config.logger.info("Sending VAU message")
         """
                 Sends an inner HTTP request through the VAU channel and processes the response.
 
@@ -324,11 +323,11 @@ class VAUKanal:
             # Send request
             headers = {
                 "Content-Type": "application/octet-stream",
-                "x-useragent": USER_AGENT,
+                "x-useragent": Config.USER_AGENT,
             }
 
             # If not PU, then add VAU-nonPU-Tracing in Header
-            if EPA_ENVIRONMENT != EpaEnvs.PROD.id:
+            if Config.EPA_ENVIRONMENT != EpaEnvs.PROD.id:
                 k2_c2s_b64 = b64encode(self.c_k2_c2s_app_data).decode('ascii')
                 k2_s2c_b64 = b64encode(self.c_k2_s2c_app_data).decode('ascii')
                 headers["VAU-nonPU-Tracing"] = f"{k2_c2s_b64} {k2_s2c_b64}"
@@ -338,31 +337,31 @@ class VAUKanal:
             if vau_np is not None:
                 headers["VAU-NP"] = vau_np
 
-            logger.debug("Sending VAU message with headers: %s", headers)
+            Config.logger.debug("Sending VAU message with headers: %s", headers)
 
             http_response = self.https_session.post(
                 self.as_url_plus_vau_cid,
                 headers=headers,
                 data=message,
-                timeout=HTTPS_TIMEOUT,
+                timeout=Config.HTTPS_TIMEOUT,
             )
 
             # Get response data
             response_data = http_response.content
 
-            logger.info("HTTP Status Code: %s", http_response.status_code)
-            logger.info(
+            Config.logger.info("HTTP Status Code: %s", http_response.status_code)
+            Config.logger.info(
                 "HTTP Response Headers: %s",
                 json.dumps(dict(http_response.headers), indent=4),
             )
-            logger.debug("HTTP Response Content: %s", http_response.content)
-            logger.debug(f"Performed on Endpoint {self.as_url_plus_vau_cid} ")
+            Config.logger.debug("HTTP Response Content: %s", http_response.content)
+            Config.logger.debug(f"Performed on Endpoint {self.as_url_plus_vau_cid} ")
             
             if http_response.status_code != status.HTTP_200_OK and http_response.headers.get("Content-Type") == "application/cbor":
                 # See: https://gemspec.gematik.de/docs/gemSpec/gemSpec_Krypt/gemSpec_Krypt_V2.45.0/#6.6
-                logger.error(f"Received non-200 HTTP status code: {http_response.status_code}")
+                Config.logger.error(f"Received non-200 HTTP status code: {http_response.status_code}")
                 error_response = cbor2.loads(response_data)
-                logger.error(f"Decoded error response: {error_response}")
+                Config.logger.error(f"Decoded error response: {error_response}")
                 error_code = error_response.get("ErrorCode", "Unknown")
                 error_message = error_response.get("ErrorMessage", "No message provided")
                 error_description = error_response.get("Description", "No description provided")
@@ -421,8 +420,8 @@ class VAUKanal:
                 self.c_k2_s2c_app_data, resp_cipher, resp_aad
             )
 
-            logger.debug("Response data: %s", response_data)
-            logger.debug("Decrypted response: %s", decrypted_resp)
+            Config.logger.debug("Response data: %s", response_data)
+            Config.logger.debug("Decrypted response: %s", decrypted_resp)
 
             return decrypted_resp
 
@@ -430,14 +429,14 @@ class VAUKanal:
             raise
         except Exception as e:
             if http_response is not None:
-                logger.error("Error sending VAU message on endpoint %s, with %s : %s", self.as_url_plus_vau_cid, http_response.status_code, str(e))
+                Config.logger.error("Error sending VAU message on endpoint %s, with %s : %s", self.as_url_plus_vau_cid, http_response.status_code, str(e))
                 raise VAUException(
                     message=f"Error sending VAU message on endpoint {self.as_url_plus_vau_cid}, with Response-Status {http_response.status_code}: {str(e)}",
                     error_code=ErrorCodes.VAU_COMMUNICATION_ERROR,
                     status_code=status.HTTP_502_BAD_GATEWAY
                 )
             else:
-                logger.error("Error sending VAU message on endpoint %s: %s", self.as_url_plus_vau_cid, str(e))
+                Config.logger.error("Error sending VAU message on endpoint %s: %s", self.as_url_plus_vau_cid, str(e))
                 raise VAUException(
                     message=f"Error sending VAU message on endpoint {self.as_url_plus_vau_cid}: {str(e)}",
                     error_code=ErrorCodes.VAU_COMMUNICATION_ERROR,
@@ -455,7 +454,7 @@ class VAUKanal:
         """
         Builds the inner HTTP header for a VAU message.
         """
-        logger.info("=== Building inner HTTP header ===")
+        Config.logger.info("=== Building inner HTTP header ===")
         try:
             utils.validate_insurant_id(insurant_id)
             inner_header = (
@@ -464,13 +463,13 @@ class VAUKanal:
                 (f"Accept: {utils.sanitize_header_value(accept_type)}\r\n" if accept_type is not None else "") +
                 (f"Content-Type: {utils.sanitize_header_value(content_type)}\r\n" if content_type is not None else "") +
                 (f"Content-Length: {utils.sanitize_header_value(str(content_length))}\r\n" if content_length is not None else "") +
-                f"x-useragent: {utils.sanitize_header_value(USER_AGENT)}\r\n"
+                f"x-useragent: {utils.sanitize_header_value(Config.USER_AGENT)}\r\n"
                 f"x-insurantid: {utils.sanitize_header_value(utils.validate_insurant_id(insurant_id))}\r\n"
                 "\r\n"
             )
             return inner_header 
         except ValueError as e:
-            logger.error("Error building inner HTTP header: %s", str(e))
+            Config.logger.error("Error building inner HTTP header: %s", str(e))
             raise VAUException(
                 message=f"Error building inner HTTP header: {str(e)}",
                 error_code=ErrorCodes.VAU_COMMUNICATION_ERROR,
@@ -514,7 +513,7 @@ class VAUKanal:
         )
 
     def get_nonce(self, insurant_id: str) -> str:
-        logger.info("=== Getting Nonce ===")
+        Config.logger.info("=== Getting Nonce ===")
         """
                 This function sends an HTTP request to obtain a nonce.
                 The function creates an inner HTTP request to the endpoint '/epa/authz/v1/getNonce' 
@@ -529,7 +528,7 @@ class VAUKanal:
                 "GET /epa/authz/v1/getNonce",
                 insurant_id,
             )
-            logger.debug("Inner HTTP request: %s", inner_request)
+            Config.logger.debug("Inner HTTP request: %s", inner_request)
             inner_request = inner_request.encode("utf-8")
 
             decrypted_resp = self.send_vau_message(inner_request)
@@ -539,7 +538,7 @@ class VAUKanal:
 
             if parsed_decrypted_resp["body"].get("nonce") is None:
                 raise ValueError(f"Nonce not found in response body: {parsed_decrypted_resp['body']}")
-            logger.debug("Nonce received: %s", parsed_decrypted_resp["body"]["nonce"])
+            Config.logger.debug("Nonce received: %s", parsed_decrypted_resp["body"]["nonce"])
             return parsed_decrypted_resp["body"]["nonce"]
         
         except (VAUException, AuthorizationException):
@@ -547,7 +546,7 @@ class VAUKanal:
         except (requests.exceptions.SSLError, SSLCertVerificationError):
             raise
         except Exception as e:
-            logger.error("Error getting Nonce from ePA-Authz-Service: %s", str(e))
+            Config.logger.error("Error getting Nonce from ePA-Authz-Service: %s", str(e))
             raise AuthenticationException(
                 message=f"Error getting Nonce from ePA-Authz-Service: {str(e)}",
                 error_code=ErrorCodes.EPA_GETNONCE_ERROR,
@@ -566,7 +565,7 @@ class VAUKanal:
                 Exception: If there is an error in sending the request or processing the response.
         """
         try:
-            logger.info("=== Sending authorization request SC ===")
+            Config.logger.info("=== Sending authorization request SC ===")
 
             inner_request = self.build_inner_header(
                 "GET /epa/authz/v1/send_authorization_request_sc",
@@ -578,8 +577,8 @@ class VAUKanal:
             decrypted_resp = self.send_vau_message(inner_request)
             parsed_decrypted_resp = self.parse_inner_http_response(decrypted_resp)
 
-            logger.info("RESPONSE SEND_AUTH_REQUEST_SC")
-            logger.debug(json.dumps(parsed_decrypted_resp, indent=4))
+            Config.logger.info("RESPONSE SEND_AUTH_REQUEST_SC")
+            Config.logger.debug(json.dumps(parsed_decrypted_resp, indent=4))
             
             utils.check_upload_response_for_errors(parsed_decrypted_resp)
             
@@ -587,12 +586,12 @@ class VAUKanal:
                 k: v[0]
                 for k, v in dict(parse.parse_qs(parse.urlsplit(parsed_decrypted_resp["headers"]["Location"]).query)).items()
             }
-            logger.debug(
+            Config.logger.debug(
                 "Location URI parameters: %s",
                 json.dumps(location_uri_parameters, indent=4),
             )
 
-            logger.info(
+            Config.logger.info(
                 "Sending GET authorization request to IDP: %s",
                 parsed_decrypted_resp["headers"]["Location"],
             )
@@ -602,14 +601,14 @@ class VAUKanal:
                 new_uri,
                 headers={
                     "Content-Type": "application/octet-stream",
-                    "x-useragent": USER_AGENT,
+                    "x-useragent": Config.USER_AGENT,
                 },
-                timeout=HTTPS_TIMEOUT,
+                timeout=Config.HTTPS_TIMEOUT,
             )
 
-            logger.debug("HTTP Content: %s", http_response.content)
-            logger.debug("HTTP Status Code: %s", http_response.status_code)
-            logger.debug("HTTP Response Headers: %s", http_response.headers)
+            Config.logger.debug("HTTP Content: %s", http_response.content)
+            Config.logger.debug("HTTP Status Code: %s", http_response.status_code)
+            Config.logger.debug("HTTP Response Headers: %s", http_response.headers)
 
             # Decode the byte string to a JSON string
             json_response = http_response.content.decode("utf-8")
@@ -617,13 +616,13 @@ class VAUKanal:
             # Parse the JSON string
             response_data = json.loads(json_response)
 
-            logger.debug("Response data: %s", json.dumps(response_data, indent=4))
+            Config.logger.debug("Response data: %s", json.dumps(response_data, indent=4))
 
             # Extract the challenge value
             challenge = response_data.get("challenge")
             user_consent = response_data.get("user_consent")
 
-            logger.debug("Challenge token received: %s", challenge)
+            Config.logger.debug("Challenge token received: %s", challenge)
 
             return challenge, user_consent
 
@@ -632,7 +631,7 @@ class VAUKanal:
         except (requests.exceptions.SSLError, SSLCertVerificationError):
             raise
         except Exception as e:
-            logger.error("Error sending a authorization request to ePA-Authz-Service: %s", str(e))
+            Config.logger.error("Error sending a authorization request to ePA-Authz-Service: %s", str(e))
             raise AuthenticationException(
                 message=f"Error sending a authorization request to ePA-Authz-Service: {str(e)}",
                 error_code=ErrorCodes.EPA_AUTHZ_ERROR,
@@ -656,7 +655,7 @@ class VAUKanal:
         """
 
         try:
-            logger.info("Sending authcode SC")
+            Config.logger.info("Sending authcode SC")
             # Define the POST body
             body = {"authorizationCode": authcode, "clientAttest": client_attest_jwt}
 
@@ -672,20 +671,20 @@ class VAUKanal:
 
             inner_request = inner_request.encode("utf-8")
 
-            logger.debug("Inner HTTP request: %s", inner_request)
+            Config.logger.debug("Inner HTTP request: %s", inner_request)
 
             decrypted_resp = self.send_vau_message(inner_request)
             parsed_decrypted_resp = self.parse_inner_http_response(decrypted_resp)
-            logger.debug("Authcode SC response: %s", json.dumps(parsed_decrypted_resp, indent=4))
+            Config.logger.debug("Authcode SC response: %s", json.dumps(parsed_decrypted_resp, indent=4))
 
             vau_np = parsed_decrypted_resp["body"]["vau-np"]
-            logger.debug("VAU-NP: %s", vau_np)
+            Config.logger.debug("VAU-NP: %s", vau_np)
             return vau_np
 
         except (requests.exceptions.SSLError, SSLCertVerificationError):
             raise
         except Exception as e:
-            logger.error("Error sending a authorization to ePA-Authz-Service: %s", str(e))
+            Config.logger.error("Error sending a authorization to ePA-Authz-Service: %s", str(e))
             raise AuthenticationException(
                 message=f"Error sending a authorization to ePA-Authz-Service: {str(e)}",
                 error_code=ErrorCodes.EPA_AUTHZ_ERROR,
@@ -726,6 +725,6 @@ class VAUKanal:
         instance.host = data["host"]
 
         instance.https_session = requests.Session()
-        instance.https_session.verify = TI_CA_BUNDLE
+        instance.https_session.verify = Config.TI_CA_BUNDLE
 
         return instance

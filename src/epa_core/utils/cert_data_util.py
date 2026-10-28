@@ -7,7 +7,7 @@ import base64
 
 
 
-from epa_core.runtime_config.logging import logger
+from epa_core.runtime_config.constants import Config
 
 class ReadCertData:
     def __init__(self, cert_base64: str):
@@ -30,20 +30,20 @@ class ReadCertData:
                         self.profession_info = profession_info
 
             except x509.ExtensionNotFound:
-                logger.error("Admission Extension not found in certificate.")
+                Config.logger.error("Admission Extension not found in certificate.")
 
         except Exception as e:
-            logger.error(f"Error during reading certificate: {e}")
+            Config.logger.error(f"Error during reading certificate: {e}")
 
     def read_telematik_id(self) -> str:
         try:
             if hasattr(self.profession_info, "registration_number"):
                 registration_number = self.profession_info.registration_number
-                logger.debug(f"Telematik-ID found in certificate: {registration_number}")        
+                Config.logger.debug(f"Telematik-ID found in certificate: {registration_number}")        
                 return registration_number
 
         except x509.ExtensionNotFound:
-                logger.error("Admission Extension not found in certificate.")
+                Config.logger.error("Admission Extension not found in certificate.")
 
         raise ValueError("Telematik-ID not found.")
     
@@ -53,11 +53,11 @@ class ReadCertData:
                 profession_oids = self.profession_info.profession_oids           
                 for profession_oid in profession_oids:
                     if profession_oid.dotted_string:
-                        logger.debug(f"Profession OIDs found in certificate: {profession_oid.dotted_string}")
+                        Config.logger.debug(f"Profession OIDs found in certificate: {profession_oid.dotted_string}")
                         return profession_oid.dotted_string
 
         except x509.ExtensionNotFound:
-            logger.error("Admission Extension not found in certificate.")
+            Config.logger.error("Admission Extension not found in certificate.")
 
         raise ValueError("Profession OIDs not found.")
 
@@ -65,20 +65,20 @@ class ReadCertData:
         try:
             org_names = self.cert.subject.get_attributes_for_oid(x509.oid.NameOID.ORGANIZATION_NAME)
             if org_names:
-                logger.debug(f"Organization name found in certificate: {org_names[0].value}")
+                Config.logger.debug(f"Organization name found in certificate: {org_names[0].value}")
                 return str(org_names[0].value)
         except Exception as e:
-            logger.error(f"Error reading organization name: {e}")
+            Config.logger.error(f"Error reading organization name: {e}")
         raise ValueError("Organization name not found in certificate.")
 
     def read_common_name(self) -> str:
         try:
             common_name_attributes = self.cert.subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)
             if common_name_attributes:
-                logger.debug(f"Common name found in certificate: {common_name_attributes[0].value}")
+                Config.logger.debug(f"Common name found in certificate: {common_name_attributes[0].value}")
                 return str(common_name_attributes[0].value)
         except Exception as e:
-            logger.error(f"Error reading common name: {e}")
+            Config.logger.error(f"Error reading common name: {e}")
         raise ValueError("Common name not found in certificate.")
 
     def read_surname(self) -> str | None:

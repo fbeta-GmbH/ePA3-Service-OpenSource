@@ -38,9 +38,8 @@ from pyhanko_certvalidator.policy_decl import (
 )
 
 # from epa_core.constants import HTTPS_TIMEOUT, TI_PKI_ROOTS_DIR, USER_AGENT
-from epa_core.runtime_config.constants import HTTPS_TIMEOUT, TI_PKI_ROOTS_DIR, USER_AGENT, TI_CA_BUNDLE
+from epa_core.runtime_config.constants import Config
 from epa_core.exceptions import ErrorCodes, VAUException
-from epa_core.runtime_config.logging import logger
 from epa_core.vau.vau_models import (
     AUT_VAU_CertData,
     ECDHPublicKey,
@@ -68,9 +67,9 @@ def _load_ti_trust_roots() -> list[asn1_x509.Certificate]:
     Raises:
         VAUException: If the root certificate directory is missing, or if no usable root certificates were found.
     """
-    if not os.path.isdir(TI_PKI_ROOTS_DIR):
+    if not os.path.isdir(Config.TI_PKI_ROOTS_DIR):
         raise VAUException(
-            message=f"TI PKI root certificate directory does not exist: {TI_PKI_ROOTS_DIR}",
+            message=f"TI PKI root certificate directory does not exist: {Config.TI_PKI_ROOTS_DIR}",
             error_code=ErrorCodes.VAU_INIT_FAILED,
             status_code=500,
         )
@@ -81,11 +80,11 @@ def _load_ti_trust_roots() -> list[asn1_x509.Certificate]:
 
     # Collect all usable root certs from the configured directory.
     ti_trust_roots: list[asn1_x509.Certificate] = []
-    for root_cert_filename in sorted(os.listdir(TI_PKI_ROOTS_DIR)):
+    for root_cert_filename in sorted(os.listdir(Config.TI_PKI_ROOTS_DIR)):
         # Only DER certificate files are considered.
         if not root_cert_filename.endswith(".der"):
             continue
-        root_cert_path = os.path.join(TI_PKI_ROOTS_DIR, root_cert_filename)
+        root_cert_path = os.path.join(Config.TI_PKI_ROOTS_DIR, root_cert_filename)
         try:
             with open(root_cert_path, "rb") as f:
                 root_cert_der = f.read()
@@ -95,29 +94,29 @@ def _load_ti_trust_roots() -> list[asn1_x509.Certificate]:
             # A_24958: skip roots whose notBefore is less than 2 years ago.
             cert_age = now - cert.not_valid_before_utc
             if cert_age < min_age:
-                logger.debug(f"Skipping TI root {root_cert_filename}: not yet 2 years old (notBefore={cert.not_valid_before_utc.isoformat()}, age={cert_age.days} days)")
+                Config.logger.debug(f"Skipping TI root {root_cert_filename}: not yet 2 years old (notBefore={cert.not_valid_before_utc.isoformat()}, age={cert_age.days} days)")
                 continue
 
             # Convert to asn1crypto type expected by pyHanko.
             ti_trust_roots.append(asn1_x509.Certificate.load(root_cert_der))
         except Exception as e:
-            logger.error(f"Failed to load TI PKI trust root {root_cert_path}: {str(e)}")
+            Config.logger.error(f"Failed to load TI PKI trust root {root_cert_path}: {str(e)}")
 
     if not ti_trust_roots:
         raise VAUException(
-            message=f"No valid TI PKI trust roots loaded from {TI_PKI_ROOTS_DIR}",
+            message=f"No valid TI PKI trust roots loaded from {Config.TI_PKI_ROOTS_DIR}",
             error_code=ErrorCodes.VAU_INIT_FAILED,
             status_code=500,
         )
 
     loaded_filenames = [cert.subject.native.get("common_name", "?") for cert in ti_trust_roots]
-    logger.debug(f"Loaded {len(ti_trust_roots)} TI PKI trust root(s) ({os.path.basename(TI_PKI_ROOTS_DIR)}): {loaded_filenames}")
-    logger.debug(f"TI PKI trust root details: {ti_trust_roots[0].subject.human_friendly}")
+    Config.logger.debug(f"Loaded {len(ti_trust_roots)} TI PKI trust root(s) ({os.path.basename(Config.TI_PKI_ROOTS_DIR)}): {loaded_filenames}")
+    Config.logger.debug(f"TI PKI trust root details: {ti_trust_roots[0].subject.human_friendly}")
 
     return ti_trust_roots
 
 # Load pinned TI roots once; these are the only certificates we trust as root of trust for chain validation.
-TI_TRUST_ROOTS: list[asn1_x509.Certificate] = _load_ti_trust_roots()
+# TI_TRUST_ROOTS: list[asn1_x509.Certificate] = _load_ti_trust_roots()
 
 # A_24958: CertData cache keyed by "<cert_hash_hex>-<cdv>". Retained indefinitely per spec.
 _cert_data_cache: dict[str, AUT_VAU_CertData] = {}
@@ -128,7 +127,7 @@ def _evict_cert_data_cache(signed_vau_server_pub_keys: SignedVauServerPubKeys|No
         return
     cache_key = f"{signed_vau_server_pub_keys.cert_hash.hex()}-{signed_vau_server_pub_keys.cdv}"
     if cache_key in _cert_data_cache:
-        logger.debug(f"Evicting CertData cache for {cache_key}")
+        Config.logger.debug(f"Evicting CertData cache for {cache_key}")
         _cert_data_cache.pop(cache_key, None)
 
 def raise_validation_failure(details: str, reference: str) -> Never:
@@ -151,7 +150,7 @@ class VAUCertificateValidator:
     def __init__(self, AS_URL: str, https_session):
         self.AS_URL = AS_URL
         self.https_session = https_session
-        self.ti_trust_roots = TI_TRUST_ROOTS
+        self.ti_trust_roots = Config.TI_TRUST_ROOTS
 
     def fetch_cert_data(self, cert_hash: bytes, cdv: int) -> AUT_VAU_CertData:
         """
@@ -172,10 +171,10 @@ class VAUCertificateValidator:
 
         # A_24958: check local cache before issuing the GET request.
         if cache_key in _cert_data_cache:
-            logger.debug(f"CertData cache hit for {cache_key}")
+            Config.logger.debug(f"CertData cache hit for {cache_key}")
             return _cert_data_cache[cache_key]
 
-        logger.debug(f"CertData cache miss for {cache_key}, fetching from server")
+        Config.logger.debug(f"CertData cache miss for {cache_key}, fetching from server")
 
         # Endpoint pattern: /CertData.<cert_hash_hex>-<cdv>
         cert_endpoint = urljoin(self.AS_URL, f"/CertData.{cert_hash_hex}-{cdv}")
@@ -183,17 +182,17 @@ class VAUCertificateValidator:
         # Request CertData
         cert_data_response = self.https_session.get(
             cert_endpoint,
-            verify=TI_CA_BUNDLE,
-            headers={"x-useragent": USER_AGENT},
-            timeout=HTTPS_TIMEOUT
+            verify=Config.TI_CA_BUNDLE,
+            headers={"x-useragent": Config.USER_AGENT},
+            timeout=Config.HTTPS_TIMEOUT
         )
 
-        logger.info(f"Requested CertData from {cert_endpoint}, status code: {cert_data_response.status_code}")
-        logger.debug(f"CertData response headers: {cert_data_response.headers}")
+        Config.logger.info(f"Requested CertData from {cert_endpoint}, status code: {cert_data_response.status_code}")
+        Config.logger.debug(f"CertData response headers: {cert_data_response.headers}")
 
         # Abort on any non-200 responses
         if cert_data_response.status_code != status.HTTP_200_OK:
-            logger.error(f"Failed to retrieve CertData: {cert_data_response.text}")
+            Config.logger.error(f"Failed to retrieve CertData: {cert_data_response.text}")
             raise_validation_failure(f"Failed to retrieve CertData: {cert_data_response.text}", "A_24957")
 
         # Validate that Content-Type header is `application/cbor` as described in A_24957.
@@ -251,18 +250,18 @@ class VAUCertificateValidator:
 
             # Load AUT-VAU certificate used for signature verification.
             cert = x509.load_der_x509_certificate(aut_vau_cert_data.cert, default_backend())
-            logger.debug(f"Loaded AUT-VAU certificate: Subject={cert.subject}, Issuer={cert.issuer}, NotBefore={cert.not_valid_before_utc}, NotAfter={cert.not_valid_after_utc}")
+            Config.logger.debug(f"Loaded AUT-VAU certificate: Subject={cert.subject}, Issuer={cert.issuer}, NotBefore={cert.not_valid_before_utc}, NotAfter={cert.not_valid_after_utc}")
 
             # ======== A_24624-01#1 ===========
             # Step #1: check that `cert_hash` matches the fetched cert.
-            logger.debug("Running VAU certificate validation for A_24624-01#1")
+            Config.logger.debug("Running VAU certificate validation for A_24624-01#1")
             Step1.validate_cert_hash(
                 cert_data=aut_vau_cert_data, expected_cert_hash=signed_vau_server_pub_keys.cert_hash
             )
 
             # ======== A_24624-01#1/#2 (overlap) ===========
             # Step #1/#2: Combined OCSP + path validation shared by steps #1 and #2.
-            logger.debug("Running overlapping VAU certificate checks for A_24624-01#1/#2")
+            Config.logger.debug("Running overlapping VAU certificate checks for A_24624-01#1/#2")
             Step1_2.validate_cert_path_with_ocsp(
                 aut_vau_cert_data=aut_vau_cert_data,
                 ocsp_response_der=signed_vau_server_pub_keys.ocsp_response,
@@ -271,18 +270,18 @@ class VAUCertificateValidator:
 
             # ======== A_24624-01#2 ===========
             # Step #2 remainder: certificate time validity.
-            logger.debug("Running VAU certificate validation for A_24624-01#2")
+            Config.logger.debug("Running VAU certificate validation for A_24624-01#2")
             Step2.validate_cert_time_validity(aut_vau_cert=cert)
 
             # ======== A_24624-01#3 ===========
             # Step #3: Check Komponenten-PKI and role OID `oid_epa_vau`.
-            logger.debug("Running VAU certificate validation for A_24624-01#3")
+            Config.logger.debug("Running VAU certificate validation for A_24624-01#3")
             Step3.validate_komponenten_pki(aut_vau_cert=cert, issuing_ca_der=aut_vau_cert_data.ca)
             Step3.validate_oid_epa_vau(aut_vau_cert=cert)
 
             # ======== A_24624-01#4 ===========
             # Step #4: Signature check for `signed_pub_keys` using AUT-VAU cert key.
-            logger.debug("Running VAU cert check A_24624-01#4")
+            Config.logger.debug("Running VAU cert check A_24624-01#4")
             Step4.validate_signed_pub_keys_signature(
                 aut_vau_cert=cert,
                 signature_es256=signed_vau_server_pub_keys.signature_es256,
@@ -303,17 +302,17 @@ class VAUCertificateValidator:
                     f"signed_pub_keys CBOR payload is invalid for VAUPublicKeyBundle: {type(e).__name__}: {e}", "A_24624-01#5",
                 )
 
-            logger.debug("Running VAU certificate validation for A_24624-01#5")
+            Config.logger.debug("Running VAU certificate validation for A_24624-01#5")
             Step5.validate_ecdh_p256_key(ecdh_public_key=decoded_signed_pub_keys.ECDH_PK)
             Step5.validate_kyber768_key(kyber_public_key=decoded_signed_pub_keys.Kyber768_PK)
 
             # ======== A_24624-01#6 ===========
             # Step #6: Validate expiry in the signed key bundle.
-            logger.debug("Running VAU certificate validation for A_24624-01#6")
+            Config.logger.debug("Running VAU certificate validation for A_24624-01#6")
             Step6.validate_signed_pub_keys_expiry(exp=decoded_signed_pub_keys.exp)
 
             # ======= All steps passed =======
-            logger.info("VAU server key validation successful")
+            Config.logger.info("VAU server key validation successful")
 
         except VAUException:
             _evict_cert_data_cache(signed_vau_server_pub_keys)
@@ -321,7 +320,7 @@ class VAUCertificateValidator:
 
         except Exception as e:
             _evict_cert_data_cache(signed_vau_server_pub_keys)
-            logger.error(f"✗ Certificate validation failed: {str(e)}")
+            Config.logger.error(f"✗ Certificate validation failed: {str(e)}")
             raise VAUException(
                 message=f"Certificate validation failed: {str(e)}",
                 error_code=ErrorCodes.VAU_CERT_VALIDATION_FAILED,
@@ -370,7 +369,7 @@ class Step1(ValidationStep):
         actual_cert_hash = hashlib.sha256(cert_data.cert).digest()
 
         if actual_cert_hash != expected_cert_hash:
-            logger.error(
+            Config.logger.error(
                 f"Certificate hash mismatch: expected {expected_cert_hash.hex()}, got {actual_cert_hash.hex()}"
             )
             cls._raise_failure("Certificate hash does not match expected value")
@@ -426,9 +425,9 @@ class Step1_2(ValidationStep):
             # Load helper chain from CertData that links AUT-VAU cert to pinned TI roots.
             untrusted_chain_certs = cls._build_untrusted_chain_certs(aut_vau_cert_data)
 
-            if logger.isEnabledFor(logging.DEBUG):
+            if Config.logger.isEnabledFor(logging.DEBUG):
                 _resp = crypto_ocsp.load_der_ocsp_response(ocsp_response_der)
-                logger.debug(f"Parsed OCSP response: status={_resp.response_status}, cert_status={_resp.certificate_status}, this_update={_resp.this_update_utc}, next_update={_resp.next_update_utc}")
+                Config.logger.debug(f"Parsed OCSP response: status={_resp.response_status}, cert_status={_resp.certificate_status}, this_update={_resp.this_update_utc}, next_update={_resp.next_update_utc}")
 
             # --- A_24624-01#1: Explicit OCSP time checks (thisUpdate, nextUpdate, 24h age) ---
             cls._validate_ocsp_time_constraints(ocsp_response_der)
@@ -483,7 +482,7 @@ class Step1_2(ValidationStep):
             if hashlib.sha256(direct_issuer_der).digest() != hashlib.sha256(aut_vau_cert_data.ca).digest():
                 cls._raise_failure("CertData CA certificate is not the direct issuer of the AUT-VAU certificate")
 
-            logger.info("✓ AUT-VAU certificate OCSP and chain validation successful")
+            Config.logger.info("✓ AUT-VAU certificate OCSP and chain validation successful")
 
         except VAUException:
             raise
@@ -621,7 +620,7 @@ class Step3(ValidationStep):
         except Exception as e:
             cls._raise_failure(f"Could not parse issuing CA certificate: {type(e).__name__}: {e}")
 
-        logger.debug(f"Issuing CA certificate: Subject={issuing_ca_cert.subject}, Issuer={issuing_ca_cert.issuer}, NotBefore={issuing_ca_cert.not_valid_before_utc}, NotAfter={issuing_ca_cert.not_valid_after_utc}") 
+        Config.logger.debug(f"Issuing CA certificate: Subject={issuing_ca_cert.subject}, Issuer={issuing_ca_cert.issuer}, NotBefore={issuing_ca_cert.not_valid_before_utc}, NotAfter={issuing_ca_cert.not_valid_after_utc}") 
         # Verify that the issuing CA certificate is the direct issuer of the AUT-VAU certificate by comparing the issuer and subject fields.
         if aut_vau_cert.issuer != issuing_ca_cert.subject:
             cls._raise_failure("CertData CA certificate is not the direct issuer of the AUT-VAU certificate")
@@ -672,7 +671,7 @@ class Step3(ValidationStep):
                     if oid == cls.OID_EPA_VAU:
                         return
 
-        logger.error(
+        Config.logger.error(
             f"Did not find required oid_epa_vau in certificate Admission extension. Found ProfessionOIDs: {', '.join(found_oids)}"
         )
         cls._raise_failure(
@@ -716,7 +715,7 @@ class Step4(ValidationStep):
 
             # ES256 requires an EC public key.
             if not isinstance(public_key, ec.EllipticCurvePublicKey):
-                logger.error("Certificate public key is not an EC key")
+                Config.logger.error("Certificate public key is not an EC key")
                 cls._raise_failure("Certificate public key is not an EC key")
 
             # Cast to specific type for better type checking
@@ -728,7 +727,7 @@ class Step4(ValidationStep):
             #   https://gemspec.gematik.de/docs/gemSpec/gemSpec_Krypt/gemSpec_Krypt_V2.48.0/#GS-A_4359-02
             #   https://gemspec.gematik.de/docs/gemSpec/gemSpec_Krypt/gemSpec_Krypt_V2.48.0/#A_23139
             if not isinstance(public_key.curve, (ec.BrainpoolP256R1, ec.SECP256R1)):
-                logger.error(
+                Config.logger.error(
                     "Certificate EC key uses unsupported curve: %s",
                     public_key.curve.name,
                 )
@@ -738,7 +737,7 @@ class Step4(ValidationStep):
 
             # Expected raw ES256 signature format: 64 bytes R||S.
             if len(signature_es256) != 64:
-                logger.error("signature-ES256 must be exactly 64 bytes")
+                Config.logger.error("signature-ES256 must be exactly 64 bytes")
                 cls._raise_failure(f"signature-ES256 must be exactly 64 bytes, got {len(signature_es256)}")
 
             # Split raw signature into R and S integers.
@@ -755,10 +754,10 @@ class Step4(ValidationStep):
                 ec.ECDSA(hashes.SHA256()),
             )
 
-            logger.info("✓ Signature verification successful")
+            Config.logger.info("✓ Signature verification successful")
 
         except InvalidSignature:
-            logger.error("✗ Invalid signature on signed public keys")
+            Config.logger.error("✗ Invalid signature on signed public keys")
             cls._raise_failure("Invalid signature on signed public keys")
 
 
