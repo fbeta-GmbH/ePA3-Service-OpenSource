@@ -1,6 +1,5 @@
 from __future__ import annotations
 from epa_core.http_status import status
-from epa_core.runtime_config.logging import logger
 
 
 class ErrorCodes:

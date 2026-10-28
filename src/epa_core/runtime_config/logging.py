@@ -31,6 +31,3 @@ def setup_logging(log_level=None):
         fmt = "%(asctime)s - %(levelname)s - %(message)s (%(filename)s:%(lineno)d)"
         coloredlogs.install(level=log_level, fmt=fmt, logger=logger, reconfigure=False)
     return logger
-
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
-logger = setup_logging(LOG_LEVEL)

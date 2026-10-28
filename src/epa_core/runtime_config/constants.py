@@ -1,19 +1,18 @@
+from dataclasses import dataclass, field
+import logging
 import os
+from pathlib import Path
+from typing import ClassVar
+from urllib.parse import urlsplit
+from types import MappingProxyType
+from asn1crypto import x509 as asn1_x509
+from collections.abc import Mapping
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from epa_core import USER_CONFIG_DIR, TEMP_DIR
-from epa_core.runtime_config.logging import logger, LOG_LEVEL
-from epa_core.runtime_config.epa_env import EpaEnvs
-from epa_core.truststores.ti.ti_truststore import TI_Truststore
-from epa_core.konnektor.pkcs12adapter import find_p12
 from epa_core.runtime_config.data.konnektor_tls_mode import KonnektorTlsMode
-
-# Dynamically load RECORD_PROVIDER_X variables from the environment
-RECORD_PROVIDER_MAPPING: dict[str, int] = {}
-for key, value in os.environ.items():
-    if key.startswith("RECORD_PROVIDER_"):
-        provider_name = value.strip()
-        provider_id = key.split("_")[-1]  # Extract the number from the variable name
-        RECORD_PROVIDER_MAPPING[provider_name] = int(provider_id)
+from epa_core.runtime_config.epa_env import EpaEnvs, EpaEnvConfig
+from epa_core.runtime_config.logging import setup_logging
 
 # DiGA professionOID - all other OIDs are treated as LE (Leistungserbringer)
 # See: gemSpec_OID Tab_PKI_403 (oid_diga = DiGA-Hersteller und -Anbieter)
@@ -35,11 +34,10 @@ PROFESSION_OID_TO_FACILITY = {
     '1.2.276.0.76.4.282': 'PAT',  # DiGA-Hersteller und -Anbieter
 }
 
+# --- DiGA author/institution generation ---
 def is_le() -> bool:
     """Check if the current SMC-B card belongs to a Leistungserbringer (non-DiGA)."""
     return os.getenv('OID_DIGA', DIGA_PROFESSION_OID) != DIGA_PROFESSION_OID
-
-# --- DiGA author/institution generation ---
 
 def generate_author() -> str:
     telematik_id = os.getenv('TELEMATIK_ID')
@@ -101,7 +99,7 @@ def set_cert_author_fields(cert_data):
     # Map professionOID to healthcareFacilityTypeCode
     facility_code = PROFESSION_OID_TO_FACILITY.get(profession_oid, 'PRA')
     os.environ['HEALTHCARE_FACILITY_TYPE_CODE'] = facility_code
-    logger.info(f"SMC-B professionOID: {profession_oid} → mode: {'le' if is_le() else 'diga'}, facility: {facility_code}")
+    Config.logger.info(f"SMC-B professionOID: {profession_oid} → mode: {'le' if is_le() else 'diga'}, facility: {facility_code}")
 
     # LE-specific: extract org name and author fields from certificate
     if is_le():
@@ -109,7 +107,7 @@ def set_cert_author_fields(cert_data):
             if not os.getenv('ORG_NAME'):
                 os.environ['ORG_NAME'] = cert_data.read_organization_name()
         except ValueError:
-            logger.warning("Could not read organization name from certificate.")
+            Config.logger.warning("Could not read organization name from certificate.")
         for field, env_key in [('read_surname', 'CERT_SURNAME'), ('read_given_name', 'CERT_GIVEN_NAME'), ('read_title', 'CERT_TITLE')]:
             try:
                 value = getattr(cert_data, field)()
@@ -167,97 +165,403 @@ def get_author_role() -> str:
         return "4^^^&1.3.6.1.4.1.19376.3.276.1.5.13&ISO"
     return "12^^^&1.3.6.1.4.1.19376.3.276.1.5.13&ISO"
 
-EPA_ENVIRONMENT = os.getenv('EPA_ENVIRONMENT', 'RT').upper()
-if EPA_ENVIRONMENT not in EpaEnvs.available_envs():
-    raise ValueError(f"Invalid EPA_ENVIRONMENT: {EPA_ENVIRONMENT}. (Available environments are: {', '.join(EpaEnvs.available_envs())})")
-
-epa_envs = EpaEnvs.get(EPA_ENVIRONMENT)
-
-def get_as_url(provider_id: str) -> str:
-    return epa_envs.get_as_url(provider_id)
-
-DEFAULT_EPA_PROVIDER_ID = os.getenv('DEFAULT_EPA_PROVIDER_ID', '2')
-DEFAULT_AS_URL = get_as_url(str(DEFAULT_EPA_PROVIDER_ID))
-IDP_URL = epa_envs.get_idp_url()
-
-USER_AGENT = os.getenv('USER_AGENT')
-
-DIGA_NAME = os.getenv('DIGA_NAME')
-DIGA_MANUFACTURER = os.getenv('DIGA_MANUFACTURER')
-SW_ADDITION_1 = os.getenv('SW_ADDITION_1')
-SW_ADDITION_2 = os.getenv('SW_ADDITION_2')
-SW_ADDITION_3 = os.getenv('SW_ADDITION_3')
-
-MANDANT_ID = os.getenv('MANDANT_ID')
-CLIENT_SYSTEM_ID = os.getenv('CLIENT_SYSTEM_ID')
-WORKPLACE_ID = os.getenv('WORKPLACE_ID')
-USER_ID = os.getenv('USER_ID')
-
-KONNEKTOR_CERT_PW = os.getenv('KONNEKTOR_CERT_PW')
+def get_as_url(epa_env: EpaEnvConfig, provider_id: str) -> str:
+    return epa_env.get_as_url(provider_id)
 
 
-HTTPS_TIMEOUT = int(os.getenv('HTTPS_TIMEOUT', '30'))
+RECORD_PROVIDER_PREFIX = "RECORD_PROVIDER_"
 
-IDP_AUTH_PATH = "/auth"
-KONNEKTOR_URL = os.getenv('KONNEKTOR_URL', '')
+class EnvironmentSettings(BaseSettings):
+    """
+    All user-configurable environment variables.
 
-if KONNEKTOR_CERT_PW is None:
-    raise ValueError("KONNEKTOR_CERT_PW is not set. Please set it in your .env file.")
-if not KONNEKTOR_URL:
-    raise ValueError("KONNEKTOR_URL is not set. Please set it in your .env file.")
+    Fields without defaults are required.
+    Fields with defaults are optional.
 
-# === Loading CA-Bundles from truststores ===
-ti_ts = TI_Truststore(
-    ca_path=os.getenv('TI_CA_BUNDLE_PATH', str(TEMP_DIR / 'ti-ca')),
-    epa_envs=epa_envs,
-    provider_mapping=RECORD_PROVIDER_MAPPING,
-    https_timeout=HTTPS_TIMEOUT,
-)
+    Field names correspond directly to environment variable names.
+    """
 
-TI_CA_BUNDLE = ti_ts.build_ca_bundle()
+    model_config = SettingsConfigDict(case_sensitive=True, extra="ignore", frozen=True)
 
-KONNEKTOR_TLS_MODE = os.getenv("KONNEKTOR_TLS_MODE", KonnektorTlsMode.SMC_K.value).lower()
-if KONNEKTOR_TLS_MODE not in [mode.value for mode in KonnektorTlsMode]:
-    raise ValueError(f"Invalid KONNEKTOR_TLS_MODE: {KONNEKTOR_TLS_MODE}. Must be one of {[mode.value for mode in KonnektorTlsMode]}.")
+    # -- Konnektor ---------------------------------
 
-KONNEKTOR_URL = os.getenv('KONNEKTOR_URL', '')
-KONNEKTOR_IP = KONNEKTOR_URL.split("//")[-1].split("/")[0].split(":")[0]  # Extract hostname or IP from URL
-KONNEKTOR_TLS_HOSTNAME = None  # Default: use IP for both connection and TLS verification
+    KONNEKTOR_URL: str = Field(description="URL used to reach the Konnektor.", min_length=1)
+    KONNEKTOR_CERT_PW: str = Field(description="Password for the Konnektor client certificate.", repr=False)
+    KONNEKTOR_TLS_MODE: KonnektorTlsMode = Field(
+        default=KonnektorTlsMode.SMC_K,
+        description=("Konnektor TLS verification mode: smc_k, alternative, or insecure.")
+    )
 
-match KONNEKTOR_TLS_MODE:
-    case KonnektorTlsMode.ALTERNATIVE.value:
-        KONNEKTOR_CA_BUNDLE = os.path.join(USER_CONFIG_DIR, "ssl", "konnektor", "cert.pem")
-        if not os.path.isfile(KONNEKTOR_CA_BUNDLE):
-            logger.error(f"KONNEKTOR_TLS_MODE=alternative is set, but the alternative certificate bundle does not exist at {KONNEKTOR_CA_BUNDLE}.")
-            raise FileNotFoundError(f"Alternative certificate bundle not found at {KONNEKTOR_CA_BUNDLE}.")
-        logger.warning(
-            f"Konnektor identity verification is ENABLED using existing certificate bundle at {KONNEKTOR_CA_BUNDLE}\n"
-            "To enable automatic refresh via ti-tls, set KONNEKTOR_TLS_MODE to \"smc_k\".\n" 
-            "For that: Be sure to set \"Zertifikat für die Authentisierung\" to \"gSMC-K Zertifikat (ECC)\"."
-        )
-    case KonnektorTlsMode.SMC_K.value:
-        KONNEKTOR_CA_BUNDLE = TI_CA_BUNDLE
-        KONNEKTOR_TLS_HOSTNAME = "konnektor.konlan"
-        KONNEKTOR_URL = f"https://{KONNEKTOR_TLS_HOSTNAME}"
-        logger.info(
-            "Konnektor identity verification is ENABLED using SMC-K certificate bundle."
-        )
-    case KonnektorTlsMode.INSECURE.value:
-        KONNEKTOR_CA_BUNDLE = None
-        logger.error(
-            "Konnektor identity verification is EXPLICITLY DISABLED via KONNEKTOR_TLS_MODE=insecure. The service cannot confirm it is talking to the real Konnektor. "
-            "This is insecure and NOT recommended for production use."
-        )
+    MANDANT_ID: str = Field(description="Konnektor Mandant ID.")
+    CLIENT_SYSTEM_ID: str = Field(description="Konnektor ClientSystem ID.")
+    WORKPLACE_ID: str = Field(description="Konnektor Workplace ID.")
+    USER_ID: str = Field(default="", description="Optional Konnektor User ID.")
 
-TI_PKI_ROOTS_DIR = ti_ts.get_root_ca_path()
+    # -- EPA ---------------------------------------
 
-logger.info(f"""
-Constants loaded:
-EPA_ENVIRONMENT: {EPA_ENVIRONMENT}
-DEFAULT_AS_URL: {DEFAULT_AS_URL}
-USER_AGENT: {USER_AGENT}
-IDP_URL: {IDP_URL}
-KONNEKTOR_URL: {KONNEKTOR_URL}
-LOG_LEVEL: {LOG_LEVEL}
-RECORD_PROVIDER_MAPPING: {RECORD_PROVIDER_MAPPING}
-""")
+    EPA_ENVIRONMENT: str = Field(default="RT", description="Target EPA environment.")
+    DEFAULT_EPA_PROVIDER_ID: str = Field(default="2", description="Default EPA provider ID.")
+
+    USER_AGENT: str = Field(description="User-Agent sent with HTTP requests.")
+
+    # -- DiGA --------------------------------------
+
+    DIGA_NAME: str = Field(description="Name of the DiGA.")
+    DIGA_MANUFACTURER: str = Field(description="Manufacturer of the DiGA.")
+    SW_ADDITION_1: str = Field(default="", description="Optional software addition 1.")
+    SW_ADDITION_2: str = Field(default="", description="Optional software addition 2.")
+    SW_ADDITION_3: str = Field(default="", description="Optional software addition 3.")
+
+    # -- Network / Certificates --------------------
+
+    HTTPS_TIMEOUT: int = Field(default=30, gt=0, description="HTTPS timeout in seconds.")
+
+    TI_CA_BUNDLE_PATH: Path | None = Field(
+        default=None,
+        description=("Directory for the TI CA bundle. Defaults to <TEMP_DIR>/ti-ca."),
+    )
+
+    # -- Logging -----------------------------------
+
+    LOG_LEVEL: str = Field(default="INFO", description="Application log level.")
+
+    # -- Validation --------------------------------
+
+    @field_validator("KONNEKTOR_TLS_MODE", mode="before")
+    @classmethod
+    def validate_tls_mode(cls, value):
+        if isinstance(value, str):
+            return value.lower()
+        return value
+
+    @field_validator("EPA_ENVIRONMENT")
+    @classmethod
+    def validate_epa_environment(cls, value: str) -> str:
+        available = EpaEnvs.available_envs()
+        if value not in available:
+            raise ValueError(f"Invalid EPA_ENVIRONMENT: {value!r}. Available options: {available}")
+        return value
+
+    @field_validator("LOG_LEVEL")
+    @classmethod
+    def validate_log_level(cls, value: str) -> str:
+        value = value.upper()
+        if value not in ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"):
+            raise ValueError(f"Invalid LOG_LEVEL: {value!r}")
+        return value
+
+    # -- Dynamic environment variables ------------
+
+    @staticmethod
+    def load_provider_mapping(environ: Mapping[str, str] | None = None) -> dict[str, int]:
+        """
+        Parse RECORD_PROVIDER_<ID>=<NAME> variables.
+
+        Returns:
+            Mapping from provider name to numeric provider ID.
+        """
+        if environ is None:
+            environ = os.environ
+
+        mapping: dict[str, int] = {}
+
+        for key, raw_name in environ.items():
+            if not key.startswith(RECORD_PROVIDER_PREFIX):
+                continue
+
+            raw_id = key.removeprefix(RECORD_PROVIDER_PREFIX)
+
+            if not raw_id or not raw_id.isascii() or not raw_id.isdecimal():
+                raise ValueError(
+                    f"Invalid provider environment variable: {key!r}. "
+                    "Expected RECORD_PROVIDER_<numeric ID>."
+                )
+
+            provider_name = raw_name.strip()
+            provider_id = int(raw_id)
+
+            if not provider_name:
+                raise ValueError(f"{key} must not be empty.")
+
+            if provider_name in mapping:
+                raise ValueError(f"Duplicate provider name: {provider_name!r}")
+
+            mapping[provider_name] = provider_id
+
+        return mapping
+
+
+@dataclass(frozen=True, slots=True)
+class KonnektorConnection:
+    url: str
+    connection_host: str
+    tls_hostname: str | None
+    ca_bundle: str | None
+    verify_certificate: bool
+
+
+def resolve_konnektor_connection(
+    settings: EnvironmentSettings,
+    user_config_dir: Path,
+    ti_ca_bundle: str,
+    logger: logging.Logger,
+) -> KonnektorConnection:
+    """
+    Resolve the Konnektor connection for the selected TLS mode.
+    """
+
+    parsed = urlsplit(settings.KONNEKTOR_URL)
+
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(f"Invalid KONNEKTOR_URL scheme: {settings.KONNEKTOR_URL!r}")
+
+    try:
+        connection_host = parsed.hostname
+        _ = parsed.port
+    except ValueError as exc:
+        raise ValueError(f"Invalid KONNEKTOR_URL: {settings.KONNEKTOR_URL!r}") from exc
+
+    if not connection_host:
+        raise ValueError(f"Invalid KONNEKTOR_URL: {settings.KONNEKTOR_URL!r}")
+
+    match settings.KONNEKTOR_TLS_MODE:
+        case KonnektorTlsMode.ALTERNATIVE:
+            if parsed.scheme != "https":
+                raise ValueError("KONNEKTOR_TLS_MODE=alternative requires an HTTPS URL.")
+
+            bundle = user_config_dir / "ssl" / "konnektor" / "cert.pem"
+
+            if not bundle.is_file():
+                raise FileNotFoundError(f"Alternative certificate bundle not found: {bundle}")
+
+            logger.warning(
+                "Konnektor identity verification is ENABLED "
+                "using the alternative CA bundle at %s. "
+                "For automatic refresh via ti-tls, use "
+                "KONNEKTOR_TLS_MODE=smc_k and configure "
+                "the gSMC-K ECC authentication certificate.",
+                bundle,
+            )
+
+            return KonnektorConnection(
+                url=settings.KONNEKTOR_URL,
+                connection_host=connection_host,
+                tls_hostname=None,
+                ca_bundle=str(bundle),
+                verify_certificate=True,
+            )
+
+        case KonnektorTlsMode.SMC_K:
+            hostname = "konnektor.konlan"
+
+            logger.info(
+                "Konnektor identity verification is ENABLED "
+                "using the SMC-K certificate bundle."
+            )
+
+            return KonnektorConnection(
+                url=f"https://{hostname}",
+                connection_host=connection_host,
+                tls_hostname=hostname,
+                ca_bundle=ti_ca_bundle,
+                verify_certificate=True,
+            )
+
+        case KonnektorTlsMode.INSECURE:
+            logger.error(
+                "Konnektor identity verification is EXPLICITLY "
+                "DISABLED. This is not recommended "
+                "for production use."
+            )
+
+            return KonnektorConnection(
+                url=settings.KONNEKTOR_URL,
+                connection_host=connection_host,
+                tls_hostname=None,
+                ca_bundle=None,
+                verify_certificate=False,
+            )
+
+
+@dataclass(frozen=True, slots=True, repr=False)
+class KonnektorConfig:
+    configured_url: str
+    cert_password: str = field(repr=False)
+    tls_mode: KonnektorTlsMode
+    mandant_id: str
+    client_system_id: str
+    workplace_id: str
+    user_id: str
+    url: str
+    connection_host: str
+    tls_hostname: str | None
+    ca_bundle: str | None
+    verify_certificate: bool
+
+
+@dataclass(frozen=True, slots=True)
+class EpaConfig:
+    environment: str
+    default_provider_id: str
+    default_as_url: str
+    idp_url: str
+    idp_auth_path: str = "/auth"
+
+
+@dataclass(frozen=True, slots=True)
+class DigaConfig:
+    name: str
+    manufacturer: str
+    sw_addition_1: str
+    sw_addition_2: str
+    sw_addition_3: str
+
+
+@dataclass(frozen=True, slots=True)
+class NetworkConfig:
+    https_timeout: int
+    user_agent: str
+
+
+@dataclass(frozen=True, slots=True)
+class PathConfig:
+    user_config_dir: Path
+    temp_dir: Path
+    data_dir: Path
+
+
+@dataclass(frozen=True, slots=True)
+class TruststoreConfig:
+    ca_bundle_path: Path
+    ti_ca_bundle: str
+    ti_pki_roots_dir: str
+    ti_trust_roots: tuple[asn1_x509.Certificate, ...]
+    provider_mapping: Mapping[str, int]
+
+
+class Config:
+    """Global application configuration.
+
+    Call init_config() exactly once before using fields other than logger.
+    """
+
+    _initialized: ClassVar[bool] = False
+
+    konnektor: ClassVar[KonnektorConfig]
+    epa: ClassVar[EpaConfig]
+    diga: ClassVar[DigaConfig]
+    network: ClassVar[NetworkConfig]
+    truststore: ClassVar[TruststoreConfig]
+    paths: ClassVar[PathConfig]
+
+    logger: ClassVar[logging.Logger] = logging.getLogger("epa_core")
+
+    @classmethod
+    def assert_initialized(cls) -> None:
+        if not cls._initialized:
+            raise RuntimeError(
+                "Config is not initialized. Call bootstrap_environment() first."
+            )
+
+
+def init_config(user_config_dir: Path, temp_dir: Path, data_dir: Path) -> None:
+    """Load settings, build the truststore, and publish configuration once.
+
+    The caller is responsible for loading .env and setting OPENSSL_CONF
+    before calling this function or importing OpenSSL-dependent modules.
+    """
+    if Config._initialized:
+        raise RuntimeError("Config is already initialized")
+    from epa_core.truststores.ti.ti_truststore import TI_Truststore
+    from epa_core.vau.validator import _load_ti_trust_roots
+
+    user_config_dir = Path(user_config_dir)
+    temp_dir = Path(temp_dir)
+    data_dir = Path(data_dir)
+
+    # Load environment variables
+    env = EnvironmentSettings()  # pyright: ignore[reportCallIssue]
+    provider_mapping = env.load_provider_mapping()
+
+    # Initialize logging
+    logger = setup_logging(log_level=env.LOG_LEVEL)
+    Config.logger = logger
+
+    # Resolve EPA environment
+    epa_env = EpaEnvs.get(env.EPA_ENVIRONMENT)
+    default_as_url = get_as_url(epa_env, env.DEFAULT_EPA_PROVIDER_ID)
+    idp_url = epa_env.get_idp_url()
+
+    # Initialize truststore
+    ti_ca_bundle_path = env.TI_CA_BUNDLE_PATH or temp_dir / "ti-ca"
+    truststore = TI_Truststore(
+        ca_path=str(ti_ca_bundle_path),
+        epa_envs=epa_env,
+        provider_mapping=provider_mapping,
+        https_timeout=env.HTTPS_TIMEOUT,
+    )
+    ti_ca_bundle = truststore.build_ca_bundle()
+    if ti_ca_bundle is None:
+        raise RuntimeError("TI truststore did not produce a CA bundle")
+
+    # Resolve Konnektor connection
+    connection = resolve_konnektor_connection(
+        settings=env,
+        user_config_dir=user_config_dir,
+        ti_ca_bundle=ti_ca_bundle,
+        logger=logger,
+    )
+
+    # Trust roots
+    ti_pki_roots_dir = truststore.get_root_ca_path()
+    ti_trust_roots = tuple(_load_ti_trust_roots(ti_pki_roots_dir, logger))
+
+    # Publish the configuration to the global Config object
+    Config.konnektor = KonnektorConfig(
+        configured_url=env.KONNEKTOR_URL,
+        cert_password=env.KONNEKTOR_CERT_PW,
+        tls_mode=env.KONNEKTOR_TLS_MODE,
+        mandant_id=env.MANDANT_ID,
+        client_system_id=env.CLIENT_SYSTEM_ID,
+        workplace_id=env.WORKPLACE_ID,
+        user_id=env.USER_ID,
+        url=connection.url,
+        connection_host=connection.connection_host,
+        tls_hostname=connection.tls_hostname,
+        ca_bundle=connection.ca_bundle,
+        verify_certificate=connection.verify_certificate,
+    )
+    Config.epa = EpaConfig(
+        environment=env.EPA_ENVIRONMENT,
+        default_provider_id=env.DEFAULT_EPA_PROVIDER_ID,
+        default_as_url=default_as_url,
+        idp_url=idp_url,
+    )
+    Config.diga = DigaConfig(
+        name=env.DIGA_NAME,
+        manufacturer=env.DIGA_MANUFACTURER,
+        sw_addition_1=env.SW_ADDITION_1,
+        sw_addition_2=env.SW_ADDITION_2,
+        sw_addition_3=env.SW_ADDITION_3,
+    )
+    Config.network = NetworkConfig(
+        https_timeout=env.HTTPS_TIMEOUT, user_agent=env.USER_AGENT
+    )
+    Config.paths = PathConfig(
+        user_config_dir=user_config_dir, temp_dir=temp_dir, data_dir=data_dir
+    )
+    Config.truststore = TruststoreConfig(
+        ca_bundle_path=ti_ca_bundle_path,
+        ti_ca_bundle=ti_ca_bundle,
+        ti_pki_roots_dir=ti_pki_roots_dir,
+        ti_trust_roots=ti_trust_roots,
+        provider_mapping=MappingProxyType(dict(provider_mapping)),
+    )
+    Config._initialized = True
+
+    logger.info(
+        "Configuration initialized: EPA_ENVIRONMENT=%s, KONNEKTOR_TLS_MODE=%s, LOG_LEVEL=%s",
+        env.EPA_ENVIRONMENT,
+        env.KONNEKTOR_TLS_MODE.value,
+        env.LOG_LEVEL,
+    )
