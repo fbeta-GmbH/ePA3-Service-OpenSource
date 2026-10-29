@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "epa-core"
-version = "2.0.0.dev1"
+version = "2.0.0"
 description = "Python library for interacting with the German electronic patient record (ePA) 3.x"
 readme = "README.md"
 license-files = ["LICENSE"]
