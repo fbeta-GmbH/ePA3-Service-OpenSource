@@ -2,6 +2,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Mapping
 
+from requests.structures import CaseInsensitiveDict
+
 
 @dataclass(frozen=True)
 class InnerHttpRequest:
@@ -15,7 +17,7 @@ class InnerHttpRequest:
 @dataclass(frozen=True)
 class InnerHttpResponse:
     status_code: int
-    headers: Mapping[str, str]
+    headers: CaseInsensitiveDict[str]
     body: object
     status_line: str
 

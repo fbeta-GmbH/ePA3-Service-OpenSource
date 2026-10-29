@@ -426,7 +426,7 @@ class Konnektor:
         }
 
         # Create the client attest string
-        client_attest = f"{base64.urlsafe_b64encode(json.dumps(jwt_header).encode()).decode().replace("=",'')}.{base64.urlsafe_b64encode(json.dumps(jwt_body).encode()).decode().replace("=",'')}"
+        client_attest = f"{base64.urlsafe_b64encode(json.dumps(jwt_header, default=str).encode()).decode().replace("=",'')}.{base64.urlsafe_b64encode(json.dumps(jwt_body, default=str).encode()).decode().replace("=",'')}"
 
         logger.debug("Client attest: %s", client_attest)
 

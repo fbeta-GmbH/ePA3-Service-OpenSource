@@ -393,7 +393,7 @@ class SoapClient:
         # Merge default input with user input
         input_data = utils.deep_merge_dicts(default_input, input_data)
         input_data = dict(dict_to_defaultdict(input_data))
-        logger.debug(f"Input data: {json.dumps(input_data, indent=4)}")
+        logger.debug(f"Input data: {json.dumps(input_data, indent=4, default=str)}")
 
         for (a, b) in [("documentEntry", "entryUUID"), ("documentEntry", "oldEntryUUID")]:
             if input_data[a].get(b) is not None and not input_data[a][b].startswith("urn:uuid:"):

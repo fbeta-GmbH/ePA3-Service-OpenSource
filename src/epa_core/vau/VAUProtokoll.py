@@ -15,6 +15,7 @@ from urllib import parse
 
 import cbor2
 import requests
+from requests.structures import CaseInsensitiveDict
 from epa_core.http_status import status
 
 from epa_core.exceptions import AuthenticationException, AuthorizationException, ErrorCodes, VAUException
@@ -279,7 +280,7 @@ class VAUKanal:
                 status_code=status.HTTP_502_BAD_GATEWAY
             )
 
-        result = {"http_status": http_status, "headers": header_dict, "body": body_json}
+        result = {"http_status": http_status, "headers": CaseInsensitiveDict(header_dict), "body": body_json}
         logger.debug("Parsed response: %s", json.dumps(result, indent=4, default=str))
         return result
 
@@ -353,7 +354,7 @@ class VAUKanal:
             logger.info("HTTP Status Code: %s", http_response.status_code)
             logger.info(
                 "HTTP Response Headers: %s",
-                json.dumps(dict(http_response.headers), indent=4),
+                json.dumps(dict(http_response.headers), indent=4, default=str),
             )
             logger.debug("HTTP Response Content: %s", http_response.content)
             logger.debug(f"Performed on Endpoint {self.as_url_plus_vau_cid} ")
@@ -589,7 +590,7 @@ class VAUKanal:
             parsed_decrypted_resp = self.parse_inner_http_response(decrypted_resp)
 
             logger.info("RESPONSE SEND_AUTH_REQUEST_SC")
-            logger.debug(json.dumps(parsed_decrypted_resp, indent=4))
+            logger.debug(json.dumps(parsed_decrypted_resp, indent=4, default=str))
             
             utils.check_upload_response_for_errors(parsed_decrypted_resp)
         
@@ -599,7 +600,7 @@ class VAUKanal:
             }
             logger.debug(
                 "Location URI parameters: %s",
-                json.dumps(location_uri_parameters, indent=4),
+                json.dumps(location_uri_parameters, indent=4, default=str),
             )
 
             logger.info(
@@ -627,7 +628,7 @@ class VAUKanal:
             # Parse the JSON string
             response_data = json.loads(json_response)
 
-            logger.debug("Response data: %s", json.dumps(response_data, indent=4))
+            logger.debug("Response data: %s", json.dumps(response_data, indent=4, default=str))
 
             # Extract the challenge value
             challenge = response_data.get("challenge")
@@ -671,7 +672,7 @@ class VAUKanal:
             body = {"authorizationCode": authcode, "clientAttest": client_attest_jwt}
 
             # Convert the body to a JSON string
-            body_json = json.dumps(body)
+            body_json = json.dumps(body, default=str)
 
             inner_request = self.build_inner_header(
                 "POST /epa/authz/v1/send_authcode_sc",
@@ -686,7 +687,7 @@ class VAUKanal:
 
             decrypted_resp = self.send_vau_message(inner_request)
             parsed_decrypted_resp = self.parse_inner_http_response(decrypted_resp)
-            logger.debug("Authcode SC response: %s", json.dumps(parsed_decrypted_resp, indent=4))
+            logger.debug("Authcode SC response: %s", json.dumps(parsed_decrypted_resp, indent=4, default=str))
 
             vau_np = parsed_decrypted_resp["body"]["vau-np"]
             logger.debug("VAU-NP: %s", vau_np)

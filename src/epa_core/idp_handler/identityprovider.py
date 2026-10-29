@@ -38,7 +38,7 @@ class IdentityProvider:
         try:
             logger.info("Getting certificates")
             response = requests.get(IDP_URL + '/certs', timeout=HTTPS_TIMEOUT)
-            logger.debug("Certificates: %s", json.dumps(response.json(), indent=4))
+            logger.debug("Certificates: %s", json.dumps(response.json(), indent=4, default=str))
             return response.json()
         except (requests.exceptions.SSLError, SSLCertVerificationError):
             raise
@@ -60,7 +60,7 @@ class IdentityProvider:
         """
         logger.info("Getting OpenID configuration")
         response = requests.get(IDP_URL + '/.well-known/openid-configuration', timeout=HTTPS_TIMEOUT)
-        logger.debug("OpenID configuration: %s", json.dumps(dict(response.headers), indent=4))
+        logger.debug("OpenID configuration: %s", json.dumps(dict(response.headers), indent=4, default=str))
         return dict(response.headers)
     
 
@@ -79,7 +79,7 @@ class IdentityProvider:
         """
         logger.info("Getting PUK IDP SIG")
         response = requests.get(self.puk_idp_sig_url, timeout=HTTPS_TIMEOUT)
-        logger.debug("PUK IDP SIG: %s", json.dumps(response.json(), indent=4))
+        logger.debug("PUK IDP SIG: %s", json.dumps(response.json(), indent=4, default=str))
         return response.text
     
 
@@ -99,7 +99,7 @@ class IdentityProvider:
         """
         logger.info("Getting PUK IDP ENC")
         response = requests.get(self.puk_idp_enc_url, timeout=HTTPS_TIMEOUT)
-        logger.debug("PUK IDP ENC: %s", json.dumps(response.json(), indent=4))
+        logger.debug("PUK IDP ENC: %s", json.dumps(response.json(), indent=4, default=str))
         return response.text
 
 
@@ -118,7 +118,7 @@ class IdentityProvider:
         """
         logger.info("Getting PUK IDP SEK")
         response = requests.get(IDP_URL + '/certs/puk_idp_sek', timeout=HTTPS_TIMEOUT)
-        logger.debug("PUK IDP SEK: %s", json.dumps(response.json(), indent=4))
+        logger.debug("PUK IDP SEK: %s", json.dumps(response.json(), indent=4, default=str))
         return response.text
     
     def get_discovery(self) -> tuple[str, str]:
@@ -241,7 +241,7 @@ class IdentityProvider:
             "njwt": challenge_token
         }
 
-        header_payload_challenge_string = f"{base64.urlsafe_b64encode(json.dumps(inner_headers).encode()).decode()}.{base64.urlsafe_b64encode(json.dumps(inner_payload).encode()).decode()}"
+        header_payload_challenge_string = f"{base64.urlsafe_b64encode(json.dumps(inner_headers, default=str).encode()).decode()}.{base64.urlsafe_b64encode(json.dumps(inner_payload, default=str).encode()).decode()}"
 
         return header_payload_challenge_string
 
@@ -287,7 +287,7 @@ class IdentityProvider:
 
         key = jwk.JWK.from_json(puk_idp_enc)
 
-        jwe_token = jwe.JWE(json.dumps(outer_payload).encode('utf-8'),
+        jwe_token = jwe.JWE(json.dumps(outer_payload, default=str).encode('utf-8'),
                      recipient=key,
                      protected=outer_header)
         

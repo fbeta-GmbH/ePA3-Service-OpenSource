@@ -19,7 +19,7 @@ def check_upload_response_for_errors(response_body:dict) -> None:
     Args:
         response_json (json): The JSON response from the upload document request.
     """
-    response_str = json.dumps(response_body)
+    response_str = json.dumps(response_body, default=str)
     
     
     if "NotEntitled" in response_str:

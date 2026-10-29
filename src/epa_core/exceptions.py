@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+import sys
 from epa_core.http_status import status
 from epa_core.runtime_config.logging import logger
 
@@ -59,6 +61,8 @@ class ErrorCodes:
 
 
 class EPABaseException(Exception):
+    """Base exception class for all ePA-related exceptions"""
+
     def __init__(self, message: str, error_code: str | None = None,
                  status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR,
                  detail: dict | None = None):
@@ -66,6 +70,19 @@ class EPABaseException(Exception):
         self.error_code = error_code
         self.status_code = status_code
         self.detail = detail
+
+        # Log from the caller location.
+        # If called while handling another exception, also include the original traceback.
+        has_active_exception = sys.exc_info()[0] is not None
+        logger.error(
+            "%s: %s (Error code: %s, Status code: %d)",
+            self.__class__.__name__,
+            message,
+            error_code or "None",
+            status_code,
+            stacklevel=2,
+            # exc_info=has_active_exception,
+        )
         super().__init__(message)
 
 

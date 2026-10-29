@@ -127,10 +127,10 @@ def send_document_to_epa(metadata: dict, document_file_name: str):
             elif isinstance(inner.body, str):
                 response_obj._content = inner.body.encode("utf-8")
             else:
-                response_obj._content = json.dumps(inner.body).encode("utf-8")
+                response_obj._content = json.dumps(inner.body, default=str).encode("utf-8")
             response_obj.status_code = inner.status_code
             response_obj.encoding = "utf-8"
-            response_obj.headers = dict(inner.headers)
+            response_obj.headers = inner.headers
             response_body = SoapClient.parse_xml_response(
                 response_obj,
                 SoapClient.Services.DocumentService.I_Document_Management.DocumentRepository_ProvideAndRegisterDocumentSet_b,
@@ -140,7 +140,7 @@ def send_document_to_epa(metadata: dict, document_file_name: str):
                 logger.info("Document uploaded successfully")
             else:
                 reg_errors = response_body.get('RegistryErrorList', {}).get('RegistryError', [])
-                raise ValueError(f"Document upload failed with errors: {', '.join([f"{e['errorCode']} ({e['codeContext']})" for e in reg_errors])}. Details: {json.dumps(response_body['RegistryErrorList'], indent=4)}")
+                raise ValueError(f"Document upload failed with errors: {', '.join([f"{e['errorCode']} ({e['codeContext']})" for e in reg_errors])}. Details: {json.dumps(response_body['RegistryErrorList'], indent=4, default=str)}")
 
         logger.info("--------------SEND DATA ABGESCHLOSSEN------------------")
 

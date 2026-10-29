@@ -22,7 +22,7 @@ system_default = tls_defaults
 # A_18464, GS-A_4387, GS-A_5035:
 #   TLS 1.1, TLS 1.0, and SSL MUST NOT be supported.
 MinProtocol = TLSv1.2
-MaxProtocol = TLSv1.2
+MaxProtocol = TLSv1.3
 
 # GS-A_4384-03:
 #   For ECDHE, P-256 and P-384 MUST be supported.
