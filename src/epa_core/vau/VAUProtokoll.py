@@ -703,3 +703,40 @@ class VAUKanal:
                 status_code=status.HTTP_401_UNAUTHORIZED
             )
 
+    def to_bytes(self) -> bytes:
+        """Convert VAUKanal instance to bytes for Redis storage"""
+        data = {
+            "vau_cid": self.vau_cid,
+            "as_url_plus_vau_cid": self.as_url_plus_vau_cid,
+            "c_key_id": self.c_key_id,
+            "c_k2_c2s_app_data": self.c_k2_c2s_app_data,
+            "c_k2_s2c_app_data": self.c_k2_s2c_app_data,
+            "encryption_counter": self.encryption_counter,
+            "request_counter": self.request_counter,
+            "last_response_counter": self.last_response_counter,
+            "host": self.host,
+        }
+        return cbor2.dumps(data)
+
+    @classmethod
+    def from_bytes(cls, data_bytes: bytes) -> "VAUKanal":
+        """Create VAUKanal instance from bytes stored in Redis"""
+        # Skips __init__ method and directly creates an instance of the class
+        instance = cls.__new__(cls)
+
+        data = cbor2.loads(data_bytes)
+
+        instance.vau_cid = data["vau_cid"]
+        instance.as_url_plus_vau_cid = data["as_url_plus_vau_cid"]
+        instance.c_key_id = data["c_key_id"]
+        instance.c_k2_c2s_app_data = data["c_k2_c2s_app_data"]
+        instance.c_k2_s2c_app_data = data["c_k2_s2c_app_data"]
+        instance.encryption_counter = data["encryption_counter"]
+        instance.request_counter = data["request_counter"]
+        instance.last_response_counter = data.get("last_response_counter", 0)  # Default to 0 if not present
+        instance.host = data["host"]
+
+        instance.https_session = requests.Session()
+        instance.https_session.verify = TI_CA_BUNDLE
+
+        return instance
