@@ -419,8 +419,15 @@ class VAUKanal:
             logger.debug("Decrypted response: %s", decrypted_resp)
 
             return decrypted_resp
-
+        
         except Exception as e:
+            if "Connection" in str(e) and "timeout" in str(e):
+                logger.error("Timeout sending VAU message on endpoint %s, with error: %s", self.as_url_plus_vau_cid, str(e))
+                raise VAUException(
+                    message=f"Timeout sending VAU message on endpoint %{self.as_url_plus_vau_cid}, with error: {str(e)}",
+                    error_code=ErrorCodes.VAU_COMMUNICATION_ERROR,
+                    status_code=status.HTTP_504_GATEWAY_TIMEOUT
+                )
             if http_response is not None:
                 logger.error("Error sending VAU message on endpoint %s, with %s : %s", self.as_url_plus_vau_cid, http_response.status_code, str(e))
                 raise VAUException(

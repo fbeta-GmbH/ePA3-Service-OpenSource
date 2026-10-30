@@ -43,6 +43,13 @@ def check_upload_response_for_errors(response_body:dict) -> None:
             ErrorCodes.DOC_REPLACE_UUID_ERROR, 
             status_code=status.HTTP_404_NOT_FOUND
             )
+        
+    if "Only an approved DocumentEntry can be target" in response_str and "RPLC" in response_str and "association" in response_str:
+        raise DocumentException(
+            "Document upload failed: Invalid target oldEntryUUID (target oldEntryUUID might have been already replaced)", 
+            ErrorCodes.DOC_REPLACE_UUID_TARGET_ERROR, 
+            status_code=status.HTTP_404_NOT_FOUND
+            )
 
     
     else: 
