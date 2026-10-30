@@ -1,18 +1,34 @@
 # ePA 3.x Integration
 
-Dieses Projekt implementiert:
-- den AuthZ-Workflow für die elektronische Patientenakte (ePA) 3.x.
-- das Schreiben eines Medizinischen Informationsobjekt (MIO) in die elektronische Patientenakte.
+Dieses Projekt stellt Python-Komponenten für die Integration der elektronischen Patientenakte (ePA) 3.x bereit.
+
+Es implementiert unter anderem:
+- den AuthZ-Workflow für den Zugriff auf die elektronische Patientenakte
+- die Kommunikation mit dem TI-Konnektor
+- die Authentifizierung über den zentralen IDP
+- den verschlüsselten Nachrichtenaustausch über den VAU-Kanal
+- die Zertifikatsprüfung über den TI-Truststore
+- die Erstellung von Requests zum Hochladen medizinischer Dokumente (z. B. MIOs)
 
 ## Voraussetzungen
 
 - Python 3.12 oder höher
-- PowerShell
-- TI-Terminal-CA (Konnektor) Zertifikat als `.p12`-Datei
+- TI-Konnektor mit entsprechendem Zugriff auf die TI-Umgebung
+- Konnektor-Zertifikat als `.p12`-Datei
+
+Unter Linux werden für die Installation von `liboqs` zusätzlich CMake, ein C-Compiler und die OpenSSL-Header benötigt.
 
 ## Installation
 
-Um alle notwendigen Abhängigkeiten zu installieren, führen Sie das Skript `install_dependencies.ps1` aus:
+Installieren Sie die benötigten Python-Abhängigkeiten:
+
+```bash
+python3.12 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e .
+```
+
+Unter Windows kann alternativ das PowerShell-Skript verwendet werden:
 
 ```powershell
 ./install_dependencies.ps1
@@ -20,80 +36,105 @@ Um alle notwendigen Abhängigkeiten zu installieren, führen Sie das Skript `ins
 
 ## Umgebungskonfiguration
 
-1. Kopieren Sie die Datei `config/.env.template` zu `config/.env`:
+1. Kopieren Sie die Datei `config/.env.template` nach `config/.env`:
+
    ```bash
    cp config/.env.template config/.env
    ```
 
-2. Füllen Sie die folgenden Umgebungsvariablen in der Datei `config/.env` aus:
+2. Legen Sie das Konnektor-Zertifikat als `.p12`-Datei im Verzeichnis `config/` ab.
+
+3. Tragen Sie die benötigten Umgebungsvariablen in `config/.env` ein.
 
 ### Basis-Konfiguration
-- `EPA_ENVIRONMENT`: Umgebung der ePA (z. B. `RU`, `RT`, `PROD`)
-- `DEFAULT_EPA_PROVIDER_ID`: ID des ePA-Aktenkontoanbieters (z. B. `1` für IBM, `2` für Bitmarck Technik / RISE)
-- `USER_AGENT`: User Agent String für HTTP-Requests
-- `KONNEKTOR_URL`: URL des Konnektors
-- `KONNEKTOR_CERT_PW`: Passwort für das Konnektor `.p12`-Zertifikat
-- `KONNEKTOR_TLS_MODE`: Modus für den TLS-Handshake mit dem Konnektor. Optionen:
-  - `"smc_k"` (empfohlen): TLS-Handshake mit gSMC-K-Zertifikat. Validierung über TI-Truststore.
-  - `"alternative"`: TLS-Handshake mit alternativem Zertifikat (Konnektor-eigenes Zertifikat muss in `config/ssl/konnektor/cert.pem` hinterlegt werden).
-  - `"insecure"`: TLS-Zertifikatsprüfung deaktiviert (unsicher, NICHT für Produktion geeignet).
-- `HTTPS_TIMEOUT`: Timeout für HTTPS-Anfragen in Sekunden (Standard: `30`)
-- `RECORD_PROVIDER_1`: Name des ersten ePA-Providers (z. B. `IBM`)
-- `RECORD_PROVIDER_2`: Name des zweiten ePA-Providers (z. B. `Bitmarck Technik`)
 
+- `EPA_ENVIRONMENT`: ePA-Umgebung (z. B. `RU`, `RT`, `PROD`)
+- `DEFAULT_EPA_PROVIDER_ID`: ID des ePA-Aktenkontoanbieters
+- `USER_AGENT`: User-Agent für HTTP-Anfragen
+- `KONNEKTOR_URL`: URL des TI-Konnektors
+- `KONNEKTOR_CERT_PW`: Passwort des Konnektor-Zertifikats
+- `KONNEKTOR_TLS_MODE`: Modus für die TLS-Verbindung zum Konnektor
+  - `smc_k`: Zertifikatsprüfung über den TI-Truststore (empfohlen)
+  - `alternative`: Verwendung eines alternativen Konnektor-Zertifikats
+  - `insecure`: Deaktivierte Zertifikatsprüfung (nicht für den Produktivbetrieb geeignet)
+- `HTTPS_TIMEOUT`: Timeout für HTTPS-Anfragen in Sekunden (Standard: `30`)
+- `RECORD_PROVIDER_1`: Name des ersten ePA-Providers
+- `RECORD_PROVIDER_2`: Name des zweiten ePA-Providers
 
 ### DiGA-Identifikation
-Folgende Variablen werden zur Erstellung des Author-Strings verwendet:
-- `DIGA_NAME`: Name Ihrer DiGA (Name der Verordnungseinheit)
-- `DIGA_MANUFACTURER`: Name des DiGA-Herstellers
-- `SW_ADDITION_1`: Ergänzung der Bezeichnung der SW 1 (optional)
-- `SW_ADDITION_2`: Ergänzung der Bezeichnung der SW 2 (optional)
-- `SW_ADDITION_3`: Ergänzung der Bezeichnung der SW 3 (optional)
 
-Alternativ können Sie auch direkt den kompletten Author-String setzen:
-- `AUTHOR`: Vollständiger Author-String (optional, überschreibt die einzelnen DiGA-Variablen)
+Die folgenden Variablen werden zur Erstellung des Author-Strings verwendet:
+
+- `DIGA_NAME`: Name der DiGA
+- `DIGA_MANUFACTURER`: Name des DiGA-Herstellers
+- `SW_ADDITION_1`: Ergänzung der Softwarebezeichnung (optional)
+- `SW_ADDITION_2`: Ergänzung der Softwarebezeichnung (optional)
+- `SW_ADDITION_3`: Ergänzung der Softwarebezeichnung (optional)
+- `AUTHOR`: Vollständiger Author-String (optional, überschreibt die einzelnen Angaben)
 
 ### Konnektor-Workspace
-- `MANDANT_ID`: ID des eingerichteten Mandanten im Konnektor
-- `CLIENT_SYSTEM_ID`: ID des eingerichteten Client-Systems im Konnektor
-- `WORKPLACE_ID`: ID des eingerichteten Arbeitsplatzes im Konnektor
+
+- `MANDANT_ID`: ID des Mandanten im Konnektor
+- `CLIENT_SYSTEM_ID`: ID des Client-Systems im Konnektor
+- `WORKPLACE_ID`: ID des Arbeitsplatzes im Konnektor
 - `USER_ID`: ID des Benutzers (optional)
 
 ### Logging
-- `LOG_LEVEL`: Logging-Level (INFO, DEBUG, ERROR, etc.)
 
-
-## Konfiguration
-
-1. Legen Sie das Konnektor-Zertifikat als `.p12`-Datei im Verzeichnis `config/` ab, z. B. als `config/cert.p12`.
-
-2. Legen Sie die Laufzeitkonfiguration in `config/.env` ab. 
-
+- `LOG_LEVEL`: Logging-Level (z. B. `INFO`, `DEBUG`, `ERROR`)
 
 ## Verwendung
 
-Führen Sie den folgenden Befehl aus, um den AuthZ-Workflow zu starten:
+### Standalone-Client
+
+Der Beispielclient kann direkt aus dem Repository gestartet werden:
 
 ```bash
-python -m app.app.client
+python examples/client.py
 ```
 
-Dabei ist `sample_metadata.insurantId` durch eine gültige Versicherten-ID zu ersetzen. 
+Die erforderlichen Einstellungen werden aus `config/.env` geladen. Für den Zugriff auf eine Patientenakte müssen eine gültige Versicherten-ID und die entsprechenden Metadaten hinterlegt sein.
 
-### Ablauf
-1. Der AuthZ-Workflow der ePA 3.x wird initiiert.
-2. Nach erfolgreicher Authentifizierung wird eine Test-MIO-Datei aus `app/data/examples/documents/REAL_EXAMPLE_1_KBV_PR_MIO_DIGA_Bundle.xml` in die Akte geschrieben.
+### Verwendung als Python-Paket
+
+Die Komponenten können auch in anderen Python-Anwendungen verwendet werden.
+
+Initialisieren Sie dazu zunächst die Umgebungskonfiguration:
+
+```python
+from epa_core import bootstrap_environment
+
+bootstrap_environment("/path/to/config")
+```
+
+Anschließend können die benötigten Komponenten importiert werden:
+
+```python
+from epa_core.konnektor.Konnektor import Konnektor
+from epa_core.vau.VAUProtokoll import VAUKanal
+```
+
+## Paket bauen
+
+Zur Erstellung eines installierbaren Python-Pakets:
+
+```bash
+python -m pip install build
+python -m build
+```
 
 ## Fehlerbehandlung
 
 Bei Problemen überprüfen Sie bitte:
-- Liegt die `.p12`-Datei im Verzeichnis `config/`?
-- Ist `config/.env` vorhanden und vollständig befüllt?
-- Ist die Versicherten-ID gültig und die restlichen Metadaten korrekt?
-- Sind alle Abhängigkeiten erfolgreich installiert worden?
-- Ist der SMC-B PIN verifiziert?
 
-# License from fbeta GmbH
+- Ist die `.p12`-Datei im Konfigurationsverzeichnis vorhanden?
+- Ist `config/.env` vollständig und korrekt befüllt?
+- Ist die TI-Umgebung über VPN bzw. Split-DNS erreichbar?
+- Ist der TI-Konnektor erreichbar?
+- Ist die SMC-B-PIN verifiziert?
+- Sind die Versicherten-ID und die Metadaten korrekt?
+
+## Lizenz
 
 This work is provided by fbeta GmbH and licensed under the Creative Commons Attribution-NoDerivatives 4.0 International License.
 
@@ -102,6 +143,6 @@ https://creativecommons.org/licenses/by-nd/4.0/
 
 © fbeta GmbH. All rights reserved.
 
-# Kontakt
+## Kontakt
 
-Bei Fragen melden Sie sich gerne per Mail an epa@fbeta.de.
+Bei Fragen wenden Sie sich gerne per Mail an epa@fbeta.de.
